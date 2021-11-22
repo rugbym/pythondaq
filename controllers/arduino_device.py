@@ -1,6 +1,6 @@
 import pyvisa as pv
 import time
-import matplotlib.pyplot as plt
+
 
 """Module to control the Arduino device.
 Available class:
@@ -16,7 +16,7 @@ ArduinoVISADevice:
 
 
 class ArduinoVISADevice:
-    """programma om verschillende taken met de arduino uit te voeren.
+    """Class to be able to perform different tasks with the Arduino device.
 
     Typical usage example:
 
@@ -60,13 +60,22 @@ class ArduinoVISADevice:
     def get_output_voltage(self, channel):
         """Prints and returns the set ouput voltage on the given channel."""
         voltage = self.device.query(f"OUT:CH{channel}:VOLT?")
-        print(f"The output voltage on CH{channel} is: {voltage} Volt")
+        if __name__ == "__main__":
+            print(f"The output voltage on CH{channel} is: {voltage} Volt")
         return voltage
 
-    def get_input_voltage(self, channel, Volts=True):
+    def get_input_voltage(self, channel):
         """Prints and returns the measured voltage on the given channel."""
         voltage = self.device.query(f"MEAS:CH{channel}:VOLT?")
-        print(f"The input voltage on CH{channel} is: {voltage} Volt")
+        if __name__ == "__main__":
+            print(f"The input voltage on CH{channel} is: {voltage} Volt")
+        return voltage
+
+    def get_input_value(self, channel):
+        """Prints and returns the measured voltage on the given channel."""
+        voltage = self.device.query(f"MEAS:CH{channel}?")
+        if __name__ == "__main__":
+            print(f"The input value on CH{channel} is: {voltage} ")
         return voltage
 
     def turn_off(self):
@@ -74,59 +83,5 @@ class ArduinoVISADevice:
         if self.outputchannel == None:
             self.outputchannel = 0
         self.device.query(f"OUT:CH{self.outputchannel} {0}")
-
-    def sweep_waardes(self, plot=False, print=True):
-        """Sweeps value settings and calculates amps and voltage.
-
-        Sweeps value on output channel from 0 to 1024 and measures value over the LED component and the current through the resistor.
-        Args:
-            plot:
-                set to True if you want to see a plot of the results, default is False
-            print:
-                set to True if you want a print of output value, voltage and measured value and voltage on channel 2, default is True"""
-        self.voltagelist = []
-        self.currentlist = []
-        for n in range(0, 1024):
-
-            self.device.query("OUT:CH0 " + f"{n}")
-
-            u_ch0 = float(self.device.query("OUT:CH0:VOLT?"))
-            u_ch1 = float(self.device.query("MEAS:CH1:VOLT?"))
-            val_ch2 = float(self.device.query("MEAS:CH2?"))
-            u_ch2 = float(self.device.query("MEAS:CH2:VOLT?"))
-            I = u_ch2 / 220
-            V = u_ch1 - u_ch2
-            self.currentlist.append(I), self.voltagelist.append(V)
-
-            if print == True:
-                print(f"{n} {u_ch0:0.2f} Volt {val_ch2} {u_ch2:0.2f} Volt")
-
-        self.device.query(f"OUT:CH0 {self.last_output_val}")
-        if plot == True:
-            self.plot()
-
-    def plot(self):
-        """Plots the voltage vs the current"""
-        plt.plot(self.voltagelist, self.currentlist)
-        plt.xlabel("Voltage over LED (V)"), plt.ylabel("Current over LED (A)")
-        plt.show()
-
-    def knipperlicht(self, tijd=10):
-        """Blinks the light.
-
-        Blinks the light for a given time, default is 10 seconds of blinking.
-
-        Args:
-            time:
-               The time in seconds of how long the light blinks"""
-        begin = time.time()
-        bezig = 0
-        n = 700
-
-        while bezig < tijd:
-            self.device.query("OUT:CH0 " + f"{n}")
-            time.sleep(0.01)
-            bezig = time.time() - begin
-            n += 1023
 
         # self.device.query(f"OUT:CH0 {self.last_output_val}")
