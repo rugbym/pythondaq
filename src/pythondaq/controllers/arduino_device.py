@@ -1,4 +1,7 @@
-import pyvisa as pv
+try:
+    from nsp2visasim import sim_pyvisa as pv
+except ModuleNotFoundError:
+    import pyvisa as pv
 import time
 
 
@@ -24,7 +27,7 @@ class ArduinoVISADevice:
     device = ArduinoVISADevice(port=port)
     voltageCH0 = device.get_output_voltage(channel=channel_number"""
 
-    def __init__(self, port="ASRL3::INSTR"):
+    def __init__(self, port):
         """Inits ArduinoVISADevice with the name of the port:
         Args:
             port:
@@ -32,8 +35,12 @@ class ArduinoVISADevice:
         self.port = port
         rm = pv.ResourceManager("@py")
         self.device = rm.open_resource(
-            self.port, read_termination="\r\n", write_termination="\n"
+            port, read_termination="\r\n", write_termination="\n"
         )
+
+    def get_id_string(self):
+        """Returns the device id"""
+        return self.device.query("*IDN?")
 
     def set_output_value(self, channel, value):
         """Sets output value of a channel to given value.
@@ -85,3 +92,9 @@ class ArduinoVISADevice:
         self.device.query(f"OUT:CH{self.outputchannel} {0}")
 
         # self.device.query(f"OUT:CH0 {self.last_output_val}")
+
+
+def ConnectedDevs():
+    """returns all connected ports"""
+    rm = pv.ResourceManager("@py")
+    return rm.list_resources()
