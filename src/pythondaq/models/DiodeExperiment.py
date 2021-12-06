@@ -48,7 +48,7 @@ class DiodeExperiment:
         self.rawdatadf = pd.DataFrame()
         self.procddatadf = pd.DataFrame()
         for i in range(samplesize):
-            for _ in self.sweep_waardes(nsteps, begin=begin, end=end):
+            for _ in self.sweep_values(nsteps, begin=begin, end=end):
                 pass
 
             self.rawdatadf[f"{i}current"], self.rawdatadf[f"{i}voltage"] = (
@@ -80,7 +80,7 @@ class DiodeExperiment:
 
         return self.procddatadf
 
-    def sweep_waardes(self, nsteps, begin=0, end=3.3):
+    def sweep_values(self, nsteps, begin=0, end=3.3):
         """Sweeps value settings and calculates amps and voltage.
 
         Sweeps value on output channel from 0 to 3.3V and measures voltage over the LED component and the current through the resistor.
@@ -125,16 +125,21 @@ class DiodeExperiment:
         """Sets the output of the device to 0"""
         self.device.turn_off()
 
-    def csv_maker(self, error, filename="data"):
+    def csv_maker(self, error, filename="data", app=True):
         """Creates a csv file with the measurements and saves it under a unique name."""
-        pad = "\\Users\\mmael\\NSP2\\pythondaq\\pythondaq\\"
+        #
+        if app == True:
+            pad = ""
+        if app == False:
+            pad = "\\Users\\mmael\\NSP2\\pythondaq\\pythondaq\\"
         i = 0
-        while os.path.exists(f"{pad+filename}{i}.csv"):
+        name = str.split(filename, ".")
+        while os.path.exists(f"{name[0]}{i}.{name[1]}"):
             i += 1
 
         if error == False:
             with open(
-                f"{pad+filename}{i}.csv", mode="w", encoding="UTF8", newline=""
+                f"{name[0]}{i}.{name[1]}", mode="w", encoding="UTF8", newline=""
             ) as f:
                 writer = csv.writer(f, delimiter=",")
                 writer.writerow(["Current (A)", "Voltage (V)"])
@@ -142,7 +147,7 @@ class DiodeExperiment:
                     writer.writerow([current, voltage])
         else:
             with open(
-                f"{pad+filename}{i}.csv", mode="w", encoding="UTF8", newline=""
+                f"{name[0]}{i}.{name[1]}", mode="w", encoding="UTF8", newline=""
             ) as f:
                 writer = csv.writer(f, delimiter=",")
                 writer.writerow(
@@ -160,24 +165,29 @@ class DiodeExperiment:
                     self.procddatadf["error voltage"],
                 ):
                     writer.writerow([current, voltage, errorcurrent, errorvoltage])
+    
+    def close_session(self):
+        self.device.disconnect_device()
 
-
-def listing(search):
+def listing(search='',app=False):
     ports = CD()
-    if search == "":
-        print(f"The list of devices is:")
-        for device in ports:
-            print(f"{device}")
+    if app==False:    
+        if search == "":
+            print(f"The list of devices is:")
+            for device in ports:
+                print(f"{device}")
 
-    else:
-        found_devices = []
-        for device in ports:
-            if search in device:
-                found_devices.append(device)
-
-        if len(found_devices) == 0:
-            print("No device was found matching the search phrase")
         else:
-            print("The device(s) matching the search phrase are:")
-            for item in found_devices:
-                print(item)
+            found_devices = []
+            for device in ports:
+                if search in device:
+                    found_devices.append(device)
+
+            if len(found_devices) == 0:
+                print("No device was found matching the search phrase")
+            else:
+                print("The device(s) matching the search phrase are:")
+                for item in found_devices:
+                    print(item)
+    
+    return ports

@@ -121,7 +121,7 @@ def scan(port, startrange, endrange, output, error, nsamples, nsteps):
             click.echo(f"{I=:.4f}, {U=:.4f}")
 
     if output != None:
-        device.csv_maker(error, filename=output)
+        device.csv_maker(error, filename=output, app=False)
 
 
 if __name__ == "__main__":

@@ -33,8 +33,8 @@ class ArduinoVISADevice:
             port:
                 A string, the name of the port, default is "ASRL3::INSTR"""
         self.port = port
-        rm = pv.ResourceManager("@py")
-        self.device = rm.open_resource(
+        self.rm = pv.ResourceManager("@py")
+        self.device = self.rm.open_resource(
             port, read_termination="\r\n", write_termination="\n"
         )
 
@@ -91,6 +91,8 @@ class ArduinoVISADevice:
             self.outputchannel = 0
         self.device.query(f"OUT:CH{self.outputchannel} {0}")
 
+    def disconnect_device(self):
+        self.device.close()
         # self.device.query(f"OUT:CH0 {self.last_output_val}")
 
 
