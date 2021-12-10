@@ -165,13 +165,14 @@ class DiodeExperiment:
                     self.procddatadf["error voltage"],
                 ):
                     writer.writerow([current, voltage, errorcurrent, errorvoltage])
-    
+
     def close_session(self):
         self.device.disconnect_device()
 
-def listing(search='',app=False):
+
+def listing(search="", app=False):
     ports = CD()
-    if app==False:    
+    if app == False:
         if search == "":
             print(f"The list of devices is:")
             for device in ports:
@@ -189,5 +190,5 @@ def listing(search='',app=False):
                 print("The device(s) matching the search phrase are:")
                 for item in found_devices:
                     print(item)
-    
+
     return ports
