@@ -59,10 +59,21 @@ class UserInterface(QtWidgets.QMainWindow):
         self.dialog = PoortSelectie(self)
         # self.dialog.exec_()
         # self.port = self.dialog.port
+        # Slots and signals
+        self.button.clicked.connect(self.store_port)
+        self.button.clicked.connect(self._write_StatusBar)
+        self.start_button.clicked.connect(self.call_scan)
+        self.quit_button.clicked.connect(self.quit_program)
+        self.save_button.clicked.connect(self.save_data)
 
     def _createStatusBar(self):
         self.statusbar = self.statusBar()
         self.statusbar.showMessage("Ready", 3000)
+
+    def _write_StatusBar(self):
+        self.device = DE(port=self.port)
+        self.statusbar.showMessage(f"Connected device: {self.device.deviceinfo()}")
+        self.device.close_session()
 
     def tab1UI(self):
         layout = QtWidgets.QVBoxLayout()
@@ -75,7 +86,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.button = QtWidgets.QPushButton("Choose port")
 
         layout.addWidget(self.button)
-        self.button.clicked.connect(self.store_port)
+
         self.tab1.setLayout(layout)
         self.tabs.setTabText(0, "Choose device")
 
@@ -124,11 +135,7 @@ class UserInterface(QtWidgets.QMainWindow):
         vbox_settings.addWidget(self.start_button)
         vbox_settings.addWidget(self.save_button)
         vbox_settings.addWidget(self.quit_button)
-        # Slots and signals
 
-        self.start_button.clicked.connect(self.call_scan)
-        self.quit_button.clicked.connect(self.quit_program)
-        self.save_button.clicked.connect(self.save_data)
         self.tabs.setTabText(1, "Measurements")
         self.tab2.setLayout(hbox)
 
@@ -168,7 +175,7 @@ class UserInterface(QtWidgets.QMainWindow):
             )
 
         end = time.time()
-        # self.device.close_session()
+        self.device.close_session()
         self.status_measurementbar.clear()
         self.status_measurementbar.setText(f"Measurement done in {end-begin:.2f}s")
         self.plot_it()
