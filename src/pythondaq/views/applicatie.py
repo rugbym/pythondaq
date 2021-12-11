@@ -1,13 +1,14 @@
-from PyQt5 import QtWidgets, uic, QtCore
+from PyQt5 import QtGui, QtWidgets, uic, QtCore
 import sys
 import time
-from pyqtgraph import Qt
+
+# from pyqtgraph import Qt
 from pythondaq.models.DiodeExperiment import DiodeExperiment as DE
 from pythondaq.models.DiodeExperiment import listing
 import numpy as np
 import pyqtgraph as pg
 import pandas as pd
-from PyQt5.QtWidgets import QMenu, QVBoxLayout
+from PyQt5.QtWidgets import QAction, QMenu, QVBoxLayout
 
 pg.setConfigOption("background", "w")
 pg.setConfigOption("foreground", "k")
@@ -18,7 +19,7 @@ class PortSelection(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super(PortSelection, self).__init__(parent)
-        self.setWindowTitle("Python Menus & Toolbars")
+        self.setWindowTitle("Device selection dialog")
         self.resize(400, 200)
         layout = QVBoxLayout(self)
         self.poorten = QtWidgets.QComboBox()
@@ -44,49 +45,73 @@ class UserInterface(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         # calls the __init__ of the parent class
         super(UserInterface, self).__init__(parent)
+        self.setWindowTitle("LED Experiment Program")
+        self.central_widget = QtWidgets.QWidget()
 
-        central_widget = QtWidgets.QWidget()
-
-        central_widget.setMinimumSize(800, 600)
-        self.tabs = QtWidgets.QTabWidget(central_widget)
+        self.central_widget.setMinimumSize(800, 600)
+        self.tabs = QtWidgets.QTabWidget(self.central_widget)
         self.setCentralWidget(self.tabs)
 
         # Adding tabs and statusbar to main Window
-        self.tab1UI()
+        # self.tab1UI()
         self.tab2UI()
+        self._createMenuBar()
         self._createStatusBar()
-
         # Code to open a dialogue which prompts to enter the port
         #
-        # self.dialog = PortSelection(self)
-        # self.dialog.exec_()
-        # self.port = self.dialog.port
+        self.show_dialog()
 
         # All slots and signals of all tabs
-        self.port_select_button.clicked.connect(self.store_port)
-        self.port_select_button.clicked.connect(self._write_StatusBar)
-        self.port_select_button.clicked.connect(self.tabIndex0)
+        self.exit.triggered.connect(self.close)
+        self.select_port.triggered.connect(self.show_dialog)
+        self.select_port.triggered.connect(self._write_StatusBar)
+        self.save.triggered.connect(self.save_data)
+
         self.start_button.clicked.connect(self.call_scan)
         self.quit_button.clicked.connect(self.quit_program)
         self.save_button.clicked.connect(self.save_data)
+
+    def show_dialog(self):
+        self.dialog = PortSelection(self)
+        self.dialog.exec_()
+        self.port = self.dialog.port
+        self._write_StatusBar()
 
     def tabIndex0(self):
         """Changes the tab Index to the measuring tab."""
         self.tabs.setCurrentIndex(1)
 
+    def _createMenuBar(self):
+        menuBar = self.menuBar()
+        # File menu
+        fileMenu = QMenu("&File", self)
+        menuBar.addMenu(fileMenu)
+        self.exit = QAction("Exit", self)
+        self.save = QAction("Save", self)
+        fileMenu.addAction(self.save)
+        fileMenu.addAction(self.exit)
+
+        deviceMenu = QMenu("&Devices", self)
+        menuBar.addMenu(deviceMenu)
+        self.select_port = QAction("Select Port", self)
+        deviceMenu.addAction(self.select_port)
+
     def _createStatusBar(self):
         """Creates the statusbar on the bottom of the screen"""
         self.statusbar = self.statusBar()
+        self.device_info = QtWidgets.QLabel()
+        self.statusbar.addWidget(self.device_info)
 
     def _write_StatusBar(self):
         """Writes the ID String of the connected device to the statusbar. Device is typically an Arduino device.
         Device ID is written when the connect port button on tab 1 is pressed"""
         self.device = DE(port=self.port)
-        self.statusbar.showMessage(f"Connected device: {self.device.deviceinfo()}")
+
+        self.device_info.setText(f"Connected device: {self.device.deviceinfo()}")
+
         self.device.close_session()
 
     def tab1UI(self):
-
         """Creates the tab in the window where one can select the port.
         Shows a combobox with all connected devices and a button to confirm the selected port"""
         self.tab1 = QtWidgets.QWidget()
@@ -107,7 +132,7 @@ class UserInterface(QtWidgets.QMainWindow):
 
     def tab2UI(self):
         self.tab2 = QtWidgets.QWidget()
-        self.tabs.addTab(self.tab2, "Tab 2")
+        self.tabs.addTab(self.tab2, "Measurements")
         hbox = QtWidgets.QHBoxLayout()
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setLabel("left", "Current over LED (mA)")
@@ -141,13 +166,13 @@ class UserInterface(QtWidgets.QMainWindow):
         self.num_measurements.setMinimum(1)
 
         self.start_button = QtWidgets.QPushButton("Start measurement")
-        self.start_button.setFixedSize(100, 40)
+        self.start_button.setFixedSize(300, 40)
         self.start_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.save_button = QtWidgets.QPushButton("Save measurements")
-        self.save_button.setFixedSize(100, 40)
+        self.save_button.setFixedSize(300, 40)
         self.save_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.quit_button = QtWidgets.QPushButton("Quit program")
-        self.quit_button.setFixedSize(100, 40)
+        self.quit_button.setFixedSize(300, 40)
         self.quit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
 
         options.addRow("Measurement status", self.status_measurementbar)
@@ -163,40 +188,30 @@ class UserInterface(QtWidgets.QMainWindow):
         self.tabs.setTabText(1, "Measurements")
         self.tab2.setLayout(hbox)
 
-    def store_port(self):
-        self.port = self.poorten.currentText()
-
     def measurementbarstatus(self):
         self.status_measurementbar.clear()
         self.status_measurementbar.setText("Measuring...")
 
     def call_scan(self):
+        """Function that calls the scan"""
         begin = time.time()
         self.device = DE(port=self.port)
-        if self.num_measurements.value() <= 1:
-            self.error = False
-            self.I, self.U = [], []
-
-            for I, U in self.device.sweep_values(100):
-                self.I.append(I * 1000), self.U.append(U)
-
-        if self.num_measurements.value() > 1:
-            self.error = True
-
-            self.proccessed = self.device.error(
-                self.num_measurements.value(),
-                self.nsteps.value(),
-                self.start_voltage.value(),
-                self.end_voltage.value(),
+        _, self.U, self.I, self.U_error, self.I_error = list(
+            zip(
+                *self.device.scan(
+                    self.nsteps.value(),
+                    self.num_measurements.value(),
+                    self.start_voltage.value(),
+                    self.end_voltage.value(),
+                )
             )
-            self.I, self.U = (
-                self.proccessed["mean current (A)"],
-                self.proccessed["mean voltage (V)"],
-            )
-            self.I_error, self.U_error = (
-                self.proccessed["error current"],
-                self.proccessed["error voltage"],
-            )
+        )
+        self.U, self.I, self.U_error, self.I_error = (
+            list(self.U),
+            list(self.I),
+            list(self.U_error),
+            list(self.I_error),
+        )
 
         end = time.time()
         self.device.close_session()
@@ -206,18 +221,18 @@ class UserInterface(QtWidgets.QMainWindow):
 
     def plot_it(self):
         self.plot_widget.clear()
-        if self.num_measurements.value() > 1:
-            error = pg.ErrorBarItem(
-                x=self.U,
-                y=self.I,
-                height=2 * self.I_error,
-                width=2 * self.U_error,
-            )
-            self.plot_widget.addItem(error)
+
+        error = pg.ErrorBarItem(
+            x=np.array(self.device.U_list),
+            y=np.array(self.device.I_list) * 1000,
+            height=2 * np.array(self.device.I_err_list) * 1000,
+            width=2 * np.array(self.device.U_err_list),
+        )
+        self.plot_widget.addItem(error)
 
         self.plot_widget.plot(
-            self.U,
-            self.I,
+            np.array(self.device.U_list),
+            np.array(self.device.I_list) * 1000,
             pen=None,
             symbol="o",
             symbolPen=pg.mkPen(color=(0, 0, 255), width=0),

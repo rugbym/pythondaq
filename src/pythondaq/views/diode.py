@@ -75,7 +75,7 @@ def measure(port, setvoltage):
     "--output",
     default=None,
     type=str,
-    help="Makes a csv of the scan. NDEe will be the given nDEe. If no nDEe is given no csv will be made.",
+    help="Makes a csv of the scan. Name will be the given nDEe. If no nDEe is given no csv will be made.",
 )
 @click.option(
     "--error/--no-error",
@@ -102,26 +102,25 @@ def scan(port, startrange, endrange, output, error, nsamples, nsteps):
     Lots of options can be given to tailor the scan to your needs."""
     device = DE(port=port)
     if error:
-        # Not the most elegant way to move a whole dataframe to the view but
-        # the way that worked.
-        errordf = device.error(nsamples, nsteps, begin=startrange, end=endrange)
+
+        measurements = device.scan(nsteps, nsamples, begin=startrange, end=endrange)
         click.echo("Mean current (A), Mean voltage (V), \u03B4 I (A), \u03B4 U (V)")
-        for current, voltage, errorcurrent, errorvoltage in zip(
-            errordf["mean current (A)"],
-            errordf["mean voltage (V)"],
-            errordf["error current"],
-            errordf["error voltage"],
+        _, voltage, current, errorvoltage, errorcurrent = list(zip(*measurements))
+        for voltage, current, errorvoltage, errorcurrent in zip(
+            voltage, current, errorvoltage, errorcurrent
         ):
             click.echo(
                 f"{current:.4f}, {voltage:.4f}, {errorcurrent:.4f}, {errorvoltage:.4f}"
             )
     else:
-        for data in device.sweep_waardes(nsteps, startrange, endrange):
-            I, U = data
-            click.echo(f"{I=:.4f}, {U=:.4f}")
+        measurements = device.scan(nsteps, 1, begin=startrange, end=endrange)
+        _, voltage, current, _, _ = list(zip(*measurements))
+        for voltage, current in zip(voltage, current):
 
+            click.echo(f"{current=:.4f}, {voltage=:.4f}")
+    click.echo(type(output))
     if output != None:
-        device.csv_maker(error, filename=output, app=False)
+        device.csv_maker(filename=output, app=False)
 
 
 if __name__ == "__main__":
