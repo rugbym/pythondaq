@@ -7,7 +7,7 @@ from pythondaq.controllers.arduino_device import ArduinoVISADevice as AVD
 from pythondaq.controllers.arduino_device import ConnectedDevs as CD
 import os
 from math import sqrt
-
+import threading
 
 """Module to model data obtained using the arduino_device module from the controllers.
 """
@@ -61,6 +61,12 @@ class DiodeExperiment:
             err_I = float("nan")
 
         return mean(U), mean(I), err_diode_voltage, err_I
+
+    def start_scan(self, nsteps, samplesize, begin, end):
+        self._scan_thread = threading.Thread(
+            target=self.scan, args=(nsteps, samplesize, begin, end)
+        )
+        self._scan_thread.start()
 
     def scan(self, nsteps, samplesize, begin=0, end=3.3):
         """Perform measurements across a range of voltages.
