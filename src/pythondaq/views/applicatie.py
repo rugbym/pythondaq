@@ -1,6 +1,7 @@
 from PyQt5 import QtGui, QtWidgets, uic, QtCore
 import sys
 import time
+import threading
 
 # from pyqtgraph import Qt
 from pythondaq.models.DiodeExperiment import DiodeExperiment as DE
@@ -8,7 +9,7 @@ from pythondaq.models.DiodeExperiment import listing
 import numpy as np
 import pyqtgraph as pg
 import pandas as pd
-from PyQt5.QtWidgets import QAction, QMenu, QVBoxLayout
+from PyQt5.QtWidgets import QAction, QDialog, QMenu, QVBoxLayout
 
 pg.setConfigOption("background", "w")
 pg.setConfigOption("foreground", "k")
@@ -20,16 +21,27 @@ class PortSelection(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super(PortSelection, self).__init__(parent)
         self.setWindowTitle("Device selection dialog")
-        self.resize(400, 200)
+        self.resize(240, 200)
         layout = QVBoxLayout(self)
+
+        self.poorten_text = QtWidgets.QLabel("Available ports:")
+        self.poorten_text.setFixedSize(240, 15)
         self.poorten = QtWidgets.QComboBox()
         for item in listing(app=True):
             self.poorten.addItem(f"{item}")
+        self.poorten.setMaximumWidth(240)
+        self.poorten.setMinimumWidth(150)
 
-        layout.addWidget(self.poorten)
         self.port_select_button = QtWidgets.QPushButton("Choose port")
+        self.text = QtWidgets.QLabel("Port can be changed in program.")
+        self.text.setFixedSize(240, 20)
 
+        layout.addWidget(self.poorten_text)
+        layout.addWidget(self.poorten)
+        layout.addWidget(self.text)
         layout.addWidget(self.port_select_button)
+        self.port_select_button.setMaximumWidth(240)
+
         self.port_select_button.clicked.connect(self.store_port)
         self.port_select_button.clicked.connect(self.open_main_app)
 
@@ -37,7 +49,7 @@ class PortSelection(QtWidgets.QDialog):
         self.port = self.poorten.currentText()
 
     def open_main_app(self):
-
+        """Simply closes the dialog"""
         self.close()
 
 
@@ -72,6 +84,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.save_button.clicked.connect(self.save_data)
 
     def show_dialog(self):
+        """Opens the dialog to select the port with."""
         self.dialog = PortSelection(self)
         self.dialog.exec_()
         self.port = self.dialog.port
@@ -82,6 +95,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.tabs.setCurrentIndex(1)
 
     def _createMenuBar(self):
+        """Creates the menu bar with different options to choose from."""
         menuBar = self.menuBar()
         # File menu
         fileMenu = QMenu("&File", self)
@@ -97,7 +111,7 @@ class UserInterface(QtWidgets.QMainWindow):
         deviceMenu.addAction(self.select_port)
 
     def _createStatusBar(self):
-        """Creates the statusbar on the bottom of the screen"""
+        """Creates the statusbar on the bottom of the screen."""
         self.statusbar = self.statusBar()
         self.device_info = QtWidgets.QLabel()
         self.statusbar.addWidget(self.device_info)
@@ -113,7 +127,8 @@ class UserInterface(QtWidgets.QMainWindow):
 
     def tab1UI(self):
         """Creates the tab in the window where one can select the port.
-        Shows a combobox with all connected devices and a button to confirm the selected port"""
+        Shows a combobox with all connected devices and a button to confirm the selected port
+        Has become irrelevant with use of dialog box."""
         self.tab1 = QtWidgets.QWidget()
         self.tabs.addTab(self.tab1, "Tab 1")
         layout = QtWidgets.QVBoxLayout()
@@ -131,6 +146,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.tabs.setTabText(0, "Choose device")
 
     def tab2UI(self):
+        """The main tab where all the scanning parameters are shown."""
         self.tab2 = QtWidgets.QWidget()
         self.tabs.addTab(self.tab2, "Measurements")
         hbox = QtWidgets.QHBoxLayout()
@@ -147,23 +163,26 @@ class UserInterface(QtWidgets.QMainWindow):
 
         self.status_measurementbar = QtWidgets.QLineEdit("No measurement done yet")
         self.status_measurementbar.setReadOnly(True)
-
+        self.status_measurementbar.setMaximumWidth(240)
         self.start_voltage = QtWidgets.QDoubleSpinBox()
         self.start_voltage.setSingleStep(0.01)
         self.start_voltage.setRange(0, 3.3)
-
+        self.start_voltage.setMaximumWidth(240)
         self.end_voltage = QtWidgets.QDoubleSpinBox()
         self.end_voltage.setSingleStep(0.01)
         self.end_voltage.setValue(3.3)
         self.end_voltage.setRange(0, 3.3)
+        self.end_voltage.setMaximumWidth(240)
 
         self.nsteps = QtWidgets.QSpinBox()
         self.nsteps.setValue(50)
         self.nsteps.setRange(10, 1023)
+        self.nsteps.setMaximumWidth(240)
 
         self.num_measurements = QtWidgets.QSpinBox()
         self.num_measurements.setValue(1)
         self.num_measurements.setMinimum(1)
+        self.num_measurements.setMaximumWidth(240)
 
         self.start_button = QtWidgets.QPushButton("Start measurement")
         self.start_button.setFixedSize(300, 40)
@@ -188,12 +207,10 @@ class UserInterface(QtWidgets.QMainWindow):
         self.tabs.setTabText(1, "Measurements")
         self.tab2.setLayout(hbox)
 
-    def measurementbarstatus(self):
-        self.status_measurementbar.clear()
-        self.status_measurementbar.setText("Measuring...")
-
     def call_scan(self):
-        """Function that calls the scan"""
+        """Function that calls the scan
+        Writes the time it has taken to perform the total scan to the measurement bar.
+        Also calls the plot function to create the plot."""
         begin = time.time()
         self.device = DE(port=self.port)
         _, self.U, self.I, self.U_error, self.I_error = list(
@@ -220,6 +237,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.plot_it()
 
     def plot_it(self):
+        """Plots the measurement data using the data stored in the model."""
         self.plot_widget.clear()
 
         error = pg.ErrorBarItem(
@@ -242,15 +260,12 @@ class UserInterface(QtWidgets.QMainWindow):
 
     def save_data(self):
         """Saves the scan in a csv by opening system save file dialog."""
-        if self.error == None:
-            QtWidgets.QDialog()
-        else:
-            filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-                filter="CSV files (*.csv)"
-            )
-            self.device.csv_maker(self.error, filename=filename)
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(filter="CSV files (*.csv)")
+        self.device.csv_maker(filename=filename)
 
     def quit_program(self):
+        """Closes the program"""
         self.close()
 
 
