@@ -128,7 +128,7 @@ class UserInterface(QtWidgets.QMainWindow):
     def _write_StatusBar(self):
         """Writes the ID String of the connected device to the statusbar. Device is typically an Arduino device.
         Device ID is written when the connect port button on tab 1 is pressed"""
-
+        self.device_info.clear()
         self.device_info.setText(f"Connected device: {self.device.deviceinfo()}")
 
     def tab1UI(self):
