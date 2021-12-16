@@ -70,8 +70,10 @@ class UserInterface(QtWidgets.QMainWindow):
         self.start_button.clicked.connect(self.upv_uzero_scan)
         self.quit_button.clicked.connect(self.quit_program)
         self.save_button.clicked.connect(self.save_data)
+
     def _createMenuBar(self):
-        
+        pass
+
     def tabIndex0(self):
         """Changes the tab Index to the measuring tab."""
         self.tabs.setCurrentIndex(1)
