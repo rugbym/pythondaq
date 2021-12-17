@@ -1,6 +1,9 @@
 from os import write
 import csv
 import numpy as np
+from statistics import mean, stdev
+from math import sqrt
+import threading
 from pythondaq.controllers.arduino_device import ArduinoVISADevice as AVD
 from pythondaq.controllers.arduino_device import ConnectedDevs as CD
 import os
@@ -9,12 +12,22 @@ import pandas as pd
 
 """Module to model data obtained using the arduino_device module from the controllers.
 """
+# Moet nog toepassen: veranderingen aan hoofdstuk 7, stroom van de zonnepaneel is stroom van de
+# weerstanden bij elkaar opgeteld, P = V I
 
 
 class PVExperiment:
     def __init__(self, port="ASRL3::INSTR"):
         """Initiates the class. Standard port is given to avoid typing or copy-pasting ports."""
         self.device = AVD(port=port)
+        self.scan_data = []
+        self.U_list = []
+        self.I_list = []
+        self.P_list = []
+        self.U_err_list = []
+        self.I_err_list = []
+        self.P_err_list = []
+        self.U_zero_list = []
 
     def deviceinfo(self):
         """Info about the current connected device."""
@@ -81,6 +94,7 @@ class PVExperiment:
         return self.procddatadf
 
     def u_pv_u_zero(self):
+        """First draft for calculating voltages"""
         nsteps, begin, end = 1000, 0, 3.3
         stepsize = (end - begin) / nsteps
 
@@ -101,91 +115,121 @@ class PVExperiment:
         self.u_zerolist = u_zerolist
         self.u_pvlist = u_pvlist
 
-    def sweep_values(self, nsteps, begin=0, end=3.3):
-        """Sweeps value settings and calculates amps and voltage.
+    def measure(self, samplesize=1):
+        """Calculate current and voltage across diode using measurements.
 
-        Sweeps value on output channel from 0 to 3.3V and measures voltage over the LED component and the current through the resistor.
-        yields the current and voltage and creates a list stored in the class.
         Args:
-            nsteps:
-                number of steps to take between the beginning of the measurement and the end. Stepsize is calculated accordingly.
-            begin:
-                Starting of the voltage sweep. Voltage 0<=begin<=3.3.
-            end:
-                Ending of the voltage sweep. Voltage 0<=begin<=3.3."""
-        voltagelist = []
-        currentlist = []
-        datalist = []
-        stepsize = (end - begin) / nsteps
-        for n in np.arange(begin, end, stepsize):
-
-            self.device.set_output_voltage(0, n)
-
-            u_ch0 = float(self.device.get_output_voltage(0))
+            N:
+                The number of measurements to make. Integer value.
+        Returns:
+            A tuple consisting of the voltage, current and error on the voltage and current
+            over the diode.
+        """
+        U, I, P = [], [], []
+        for _ in range(samplesize):
             u_ch1 = float(self.device.get_input_voltage(1))
-            val_ch2 = float(self.device.get_input_value(2))
             u_ch2 = float(self.device.get_input_voltage(2))
-            I = u_ch2 / 220
-            U = u_ch1 - u_ch2
-            currentlist.append(I), voltagelist.append(U)
-            datalist.append((I, U))
-            if print == True:
-                print(f"{n} {u_ch0:0.2f} Volt {val_ch2} {u_ch2:0.2f} Volt")
 
-            yield I, U
+            I_pv = u_ch2 / 4.7 + u_ch1 / (10 ** 6)
 
-        self.voltagelist = voltagelist
-        self.currentlist = currentlist
-        self.device.set_output_voltage(0, 0)
-        self.datalist = datalist
-        data = (self.voltagelist, self.currentlist)
+            u_pv = 3 * u_ch1
+            p_pv = u_pv * I_pv
+            U.append(u_pv)
+            I.append(I_pv)
+            P.append(p_pv)
 
-        # return voltagelist, currentlist
+        if samplesize > 1:
+            err_pv_voltage = stdev(U) / sqrt(samplesize)
+            err_pv_I = stdev(I) / sqrt(samplesize)
+            err_pv_power = stdev(P) / sqrt(samplesize)
+        else:
+            err_pv_voltage = float("nan")
+            err_pv_I = float("nan")
+            err_pv_power = float("nan")
+
+        return mean(U), mean(I), mean(P), err_pv_voltage, err_pv_I, err_pv_power
+
+    def start_scan(self, nsteps, samplesize, begin, end):
+        """Allows for threading and simultanious execution of code"""
+        self._scan_thread = threading.Thread(
+            target=self.scan, args=(nsteps, samplesize, begin, end)
+        )
+        self._scan_thread.start()
+
+    def scan(self, nsteps, samplesize, begin=0, end=3.3):
+        """Perform measurements across a range of voltages.
+
+        Generates a measurement and then uses
+        the list stored in the class to add to its frame of measurements. Calculates
+        the mean and the error over the values.
+
+        Args:
+            samplesize:
+                The number of measurements to make
+            nsteps:
+                The number of steps to take between the begin and end voltage
+            begin:
+                Starting voltage value of the sweep
+            end:
+                Ending value of the sweep
+        """
+        self.scan_data = []
+        self.U_list = []
+        self.I_list = []
+        self.P_list = []
+        self.U_err_list = []
+        self.I_err_list = []
+        self.P_err_list = []
+        self.U_zero_list = []
+        for voltage in np.linspace(begin, end, nsteps):
+            self.set_voltage(voltage)
+            measurement = self.measure(samplesize)
+            self.scan_data.append((voltage,) + measurement)
+            u, i, p, u_err, i_err, p_err = measurement
+            self.U_list.append(u)
+            self.I_list.append(i)
+            self.P_list.append(p)
+            self.U_err_list.append(u_err)
+            self.I_err_list.append(i_err)
+            self.P_err_list.append(p_err)
+            self.U_zero_list.append(voltage)
+
+        return self.scan_data
 
     def reset_out(self):
         """Sets the output of the device to 0"""
         self.device.turn_off()
 
-    def csv_maker(self, error, filename="data", app=True):
+    def csv_maker(self, filename, app=True):
         """Creates a csv file with the measurements and saves it under a unique name."""
         #
+        if len(str.split(filename, ".csv")) == 1:
+            filename = filename + ".csv"
         if app == True:
             pad = ""
         if app == False:
             pad = "\\Users\\mmael\\NSP2\\pythondaq\\pythondaq\\"
+
         i = 0
         name = str.split(filename, ".")
         while os.path.exists(f"{name[0]}{i}.{name[1]}"):
             i += 1
 
-        if error == False:
-            with open(
-                f"{name[0]}{i}.{name[1]}", mode="w", encoding="UTF8", newline=""
-            ) as f:
-                writer = csv.writer(f, delimiter=",")
-                writer.writerow(["Current (A)", "Voltage (V)"])
-                for current, voltage in zip(self.currentlist, self.voltagelist):
-                    writer.writerow([current, voltage])
-        else:
-            with open(
-                f"{name[0]}{i}.{name[1]}", mode="w", encoding="UTF8", newline=""
-            ) as f:
-                writer = csv.writer(f, delimiter=",")
-                writer.writerow(
-                    [
-                        "Mean current (A)",
-                        "Mean voltage (V)",
-                        "\u03B4 I (A)",
-                        "\u03B4 U (V)",
-                    ]
-                )
-                for current, voltage, errorcurrent, errorvoltage in zip(
-                    self.procddatadf["mean current (A)"],
-                    self.procddatadf["mean voltage (V)"],
-                    self.procddatadf["error current"],
-                    self.procddatadf["error voltage"],
-                ):
-                    writer.writerow([current, voltage, errorcurrent, errorvoltage])
+        with open(
+            f"{name[0]}{i}.{name[1]}", mode="w", encoding="UTF8", newline=""
+        ) as f:
+            writer = csv.writer(f, delimiter=",")
+            writer.writerow(
+                [
+                    "Output voltage (V)",
+                    "Mean current (A)",
+                    "Mean voltage (V)",
+                    "\u03B4 I (A)",
+                    "\u03B4 U (V)",
+                ]
+            )
+            for measurement in self.scan_data:
+                writer.writerow(measurement)
 
     def close_session(self):
         self.device.disconnect_device()
