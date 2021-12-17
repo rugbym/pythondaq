@@ -22,6 +22,7 @@ class PVExperiment:
     def __init__(self, port="ASRL3::INSTR"):
         """Initiates the class. Standard port is given to avoid typing or copy-pasting ports."""
         self.device = AVD(port=port)
+        self._scan_thread=None
         self.scan_data = []
         self.U_list = []
         self.I_list = []
