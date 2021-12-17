@@ -90,7 +90,7 @@ class PVExperiment:
             try:
                 R_mosfet = (u_pv - u_ch2) / I_mosfet
             except ZeroDivisionError:
-                R_mosfet = float("inf")
+                R_mosfet = (u_pv - u_ch2) / 0.000001
 
             U.append(u_pv)
             I.append(I_pv)
@@ -104,7 +104,7 @@ class PVExperiment:
             try:
                 err_mosfet_R = stdev(R) / sqrt(samplesize)
             except stdev(R) / sqrt(samplesize) == 0:
-                err_mosfet_R = 0.0001
+                err_mosfet_R = 0.00001
         else:
             err_pv_voltage = float("nan")
             err_pv_I = float("nan")
@@ -131,12 +131,13 @@ class PVExperiment:
 
     def fit_it(self):
         self.fit_plot_list = []
-        fitfunc = lambda U, nT, I_l, I_0, e, k: I_l - I_0 * (
-            np.exp((e * U) / (nT * k)) - 1
+        fitfunc = lambda U, n, T, I_l, I_0, e, k: I_l - I_0 * (
+            np.exp((e * U) / (n * T * k)) - 1
         )
         model = models.Model(fitfunc)
         params = model.make_params()
-        params.add("nT", value=5000)
+        params.add("T", value=293, vary=False)
+        params.add("n", value=17)
         params.add("e", value=elementary_charge, vary=False)
         params.add("k", value=Boltzmann, vary=False)
         params.add("I_l", value=0.02)
