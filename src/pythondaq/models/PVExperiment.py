@@ -28,6 +28,8 @@ class PVExperiment:
         self.I_err_list = []
         self.P_err_list = []
         self.U_zero_list = []
+        self.R_MOSFET_list = []
+        self.R_MOSFET_err_list = []
 
     def deviceinfo(self):
         """Info about the current connected device."""
@@ -39,59 +41,6 @@ class PVExperiment:
     def meas_curr_diode(self):
         u_ch2 = float(self.device.get_input_voltage(2))
         return u_ch2 / 220
-
-    def error(self, samplesize, nsteps, begin, end):
-        """Calculates the error on current and voltage over the diode
-        based on given number of measurements.
-
-        Generates a measurement and then uses
-        the list stored in the class to add to its frame of measurements. Calculates
-        the mean and the error over the values.
-
-        Args:
-            samplesize:
-                The number of measurements to make
-            nsteps:
-                The number of steps to take between the begin and end voltage
-            begin:
-                Starting voltage value of the sweep
-            end:
-                Ending value of the sweep
-        """
-        self.rawdatadf = pd.DataFrame()
-        self.procddatadf = pd.DataFrame()
-        for i in range(samplesize):
-            for _ in self.sweep_values(nsteps, begin=begin, end=end):
-                pass
-
-            self.rawdatadf[f"{i}current"], self.rawdatadf[f"{i}voltage"] = (
-                self.currentlist,
-                self.voltagelist,
-            )
-        (
-            self.procddatadf["mean current (A)"],
-            self.procddatadf["mean voltage (V)"],
-        ) = np.mean(
-            self.rawdatadf.loc[:, ["current" in i for i in self.rawdatadf.columns]],
-            axis=1,
-        ), np.mean(
-            self.rawdatadf.loc[:, ["voltage" in i for i in self.rawdatadf.columns]],
-            axis=1,
-        )
-        self.procddatadf["error current"], self.procddatadf["error voltage"] = (
-            np.std(
-                self.rawdatadf.loc[:, ["current" in i for i in self.rawdatadf.columns]],
-                axis=1,
-            )
-            / np.sqrt(samplesize),
-            np.std(
-                self.rawdatadf.loc[:, ["voltage" in i for i in self.rawdatadf.columns]],
-                axis=1,
-            )
-            / np.sqrt(samplesize),
-        )
-
-        return self.procddatadf
 
     def u_pv_u_zero(self):
         """First draft for calculating voltages"""
@@ -181,6 +130,8 @@ class PVExperiment:
         self.I_err_list = []
         self.P_err_list = []
         self.U_zero_list = []
+        self.R_MOSFET_list = []
+        self.R_MOSFET_err_list = []
         for voltage in np.linspace(begin, end, nsteps):
             self.set_voltage(voltage)
             measurement = self.measure(samplesize)
@@ -193,7 +144,8 @@ class PVExperiment:
             self.I_err_list.append(i_err)
             self.P_err_list.append(p_err)
             self.U_zero_list.append(voltage)
-
+            self.R_MOSFET_list.append()
+            self.R_MOSFET_err_list.append()
         return self.scan_data
 
     def reset_out(self):
