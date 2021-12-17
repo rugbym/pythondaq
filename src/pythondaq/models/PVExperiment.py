@@ -7,7 +7,6 @@ import threading
 from pythondaq.controllers.arduino_device import ArduinoVISADevice as AVD
 from pythondaq.controllers.arduino_device import ConnectedDevs as CD
 import os
-import click
 import pandas as pd
 
 """Module to model data obtained using the arduino_device module from the controllers.
@@ -74,29 +73,47 @@ class PVExperiment:
             A tuple consisting of the voltage, current and error on the voltage and current
             over the diode.
         """
-        U, I, P = [], [], []
+        U, I, P, R = [], [], [], []
         for _ in range(samplesize):
             u_ch1 = float(self.device.get_input_voltage(1))
             u_ch2 = float(self.device.get_input_voltage(2))
-
-            I_pv = u_ch2 / 4.7 + u_ch1 / (10 ** 6)
+            I_mosfet = u_ch2 / 4.7
+            I_ch1 = u_ch1 / (10 ** 6)
+            I_pv = I_mosfet + I_ch1
 
             u_pv = 3 * u_ch1
             p_pv = u_pv * I_pv
+            try:
+                R_mosfet = (u_pv - u_ch2) / I_mosfet
+            except ZeroDivisionError:
+                R_mosfet = float("inf")
+
             U.append(u_pv)
             I.append(I_pv)
             P.append(p_pv)
+            R.append(R_mosfet)
 
         if samplesize > 1:
             err_pv_voltage = stdev(U) / sqrt(samplesize)
             err_pv_I = stdev(I) / sqrt(samplesize)
             err_pv_power = stdev(P) / sqrt(samplesize)
+            err_mosfet_R = stdev(R) / sqrt(samplesize)
         else:
             err_pv_voltage = float("nan")
             err_pv_I = float("nan")
             err_pv_power = float("nan")
+            err_mosfet_R = float("nan")
 
-        return mean(U), mean(I), mean(P), err_pv_voltage, err_pv_I, err_pv_power
+        return (
+            mean(U),
+            mean(I),
+            mean(P),
+            mean(R),
+            err_pv_voltage,
+            err_pv_I,
+            err_pv_power,
+            err_mosfet_R,
+        )
 
     def start_scan(self, nsteps, samplesize, begin, end):
         """Allows for threading and simultanious execution of code"""
@@ -136,7 +153,7 @@ class PVExperiment:
             self.set_voltage(voltage)
             measurement = self.measure(samplesize)
             self.scan_data.append((voltage,) + measurement)
-            u, i, p, u_err, i_err, p_err = measurement
+            u, i, p, r, u_err, i_err, p_err, r_err = measurement
             self.U_list.append(u)
             self.I_list.append(i)
             self.P_list.append(p)
@@ -144,8 +161,8 @@ class PVExperiment:
             self.I_err_list.append(i_err)
             self.P_err_list.append(p_err)
             self.U_zero_list.append(voltage)
-            self.R_MOSFET_list.append()
-            self.R_MOSFET_err_list.append()
+            self.R_MOSFET_list.append(r)
+            self.R_MOSFET_err_list.append(r_err)
         return self.scan_data
 
     def reset_out(self):
