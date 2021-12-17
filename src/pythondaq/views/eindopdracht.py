@@ -81,10 +81,13 @@ class UserInterface(QtWidgets.QMainWindow):
         self.show_dialog()
 
         # plot timer
-        self.plot_timer = QtCore.QTimer()
-        # Calls plot every 100ms
-        self.plot_timer.timeout.connect(self.plot_it)
-        self.plot_timer.start(100)
+        self.timer = QtCore.QTimer()
+        # Calls plot and measurement status every 100ms
+        self.timer.timeout.connect(self.plot_it)
+        self.timer.timeout.connect(self.measurement_status)
+
+        self.timer.start(100)
+
         # All slots and signals of all tabs
         self.exit.triggered.connect(self.close)
         self.select_port.triggered.connect(self.show_dialog)
@@ -117,9 +120,9 @@ class UserInterface(QtWidgets.QMainWindow):
         options = QtWidgets.QFormLayout()
         vbox_settings.addLayout(options)
 
-        # self.status_measurementbar = QtWidgets.QLineEdit("No measurement done yet")
-        # self.status_measurementbar.setReadOnly(True)
-        # self.status_measurementbar.setMaximumWidth(240)
+        self.status_measurementbar = QtWidgets.QLineEdit("No measurement done yet")
+        self.status_measurementbar.setReadOnly(True)
+        self.status_measurementbar.setMaximumWidth(240)
         self.fit_knop = QtWidgets.QPushButton("Fit")
 
         self.start_voltage = QtWidgets.QDoubleSpinBox()
@@ -152,7 +155,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.quit_button.setFixedSize(300, 40)
         self.quit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
 
-        # options.addRow("Measurement status", self.status_measurementbar)
+        options.addRow(self.status_measurementbar)
         options.addRow("Start voltage:", self.start_voltage)
         options.addRow("End voltage:", self.end_voltage)
         options.addRow("Number of steps:", self.nsteps)
@@ -190,6 +193,15 @@ class UserInterface(QtWidgets.QMainWindow):
         Device ID is written when the connect port button on tab 1 is pressed"""
         self.device_info.clear()
         self.device_info.setText(f"Connected device: {self.device.deviceinfo()}")
+
+    def measurement_status(self):
+        """Shows the measurement status above the measurement settings"""
+        if self.device._scan_thread == None:
+            self.status_measurementbar.setText("No measurement done")
+        elif self.device._scan_thread.is_alive():
+            self.status_measurementbar.setText("Measuring...")
+        elif not self.device._scan_thread.is_alive():
+            self.status_measurementbar.setText("Measurement done")
 
     def I_U_plottab(self):
         self.I_U_tab = QtWidgets.QWidget()
@@ -229,6 +241,7 @@ class UserInterface(QtWidgets.QMainWindow):
             self.start_voltage.value(),
             self.end_voltage.value(),
         )
+        self.status_measurementbar.setText("Measuring")
 
         # self.device.close_session()
         # self.status_measurementbar.clear()
