@@ -96,10 +96,15 @@ class UserInterface(QtWidgets.QMainWindow):
         self.save_button.clicked.connect(self.save_data)
         self.fit_knop.clicked.connect(self.fit_call)
 
-    def fit_call(self):
-        self.device.fit_it()
-        self.fit_state = True
-        self.plot_it()
+    def show_dialog(self):
+        """Opens the dialog to select the port with."""
+        self.dialog = PortSelection(self)
+        self.dialog.exec_()
+        self.port = self.dialog.port
+        if self.device != None:
+            self.device.close_session()
+        self.device = PVE(port=self.port)
+        self._write_StatusBar()
 
     def permanent_controls(self):
 
@@ -154,23 +159,9 @@ class UserInterface(QtWidgets.QMainWindow):
         options.addRow("Number of measurements:", self.num_measurements)
 
         vbox_settings.addWidget(self.start_button)
-        vbox_settings.addWidget(self.save_button)
-        vbox_settings.addWidget(self.quit_button)
+        # vbox_settings.addWidget(self.save_button)
+        # vbox_settings.addWidget(self.quit_button)
         vbox_settings.addWidget(self.fit_knop)
-
-    def show_dialog(self):
-        """Opens the dialog to select the port with."""
-        self.dialog = PortSelection(self)
-        self.dialog.exec_()
-        self.port = self.dialog.port
-        if self.device != None:
-            self.device.close_session()
-        self.device = PVE(port=self.port)
-        self._write_StatusBar()
-
-    def tabIndex0(self):
-        """Changes the tab Index to the measuring tab."""
-        self.tabs.setCurrentIndex(1)
 
     def _createMenuBar(self):
         """Creates the menu bar with different options to choose from."""
@@ -214,7 +205,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.tabs.addTab(self.U_U_tab, "U_0 vs U_pv")
         hbox = QtWidgets.QHBoxLayout()
         self.plot_widget = pg.PlotWidget()
-
+        self.plot_widget.setRange(xRange=(0, self.end_voltage.value()), yRange=(0, 6))
         hbox.addWidget(self.plot_widget)
 
         self.U_U_tab.setLayout(hbox)
@@ -292,13 +283,13 @@ class UserInterface(QtWidgets.QMainWindow):
         self.P_R_plot.clear()
         self.P_R_plot.setLabel("left", "P (W)")
         self.P_R_plot.setLabel("bottom", "R_mosfet (ohm)")
-        # error = pg.ErrorBarItem(
-        #     x=np.array(self.device.R_MOSFET_list),
-        #     y=np.array(self.device.P_list),
-        #     height=2 * np.array(self.device.P_err_list),
-        #     width=2 * np.array(self.device.R_MOSFET_list),
-        # )
-        # self.P_R_plot.addItem(error)
+        error = pg.ErrorBarItem(
+            x=np.array(self.device.R_MOSFET_list),
+            y=np.array(self.device.P_list),
+            height=2 * np.array(self.device.P_err_list),
+            width=2 * np.array(self.device.R_MOSFET_list),
+        )
+        self.P_R_plot.addItem(error)
 
         self.P_R_plot.plot(
             np.array(self.device.R_MOSFET_list),
@@ -313,8 +304,14 @@ class UserInterface(QtWidgets.QMainWindow):
             self.I_U_plot.plot(
                 self.device.fit_plot_list[0],
                 self.device.fit_plot_list[1],
-                pen=pg.mkPen(color=(255, 0, 0)),
+                pen=pg.mkPen(color=(255, 0, 0), width=2),
             )
+
+    def fit_call(self):
+        """Calls fit and functions to display results"""
+        self.device.fit_it()
+        self.fit_state = True
+        self.plot_it()
 
     def save_data(self):
         """Saves the scan in a csv by opening system save file dialog."""
