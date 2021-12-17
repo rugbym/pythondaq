@@ -56,6 +56,7 @@ class UserInterface(QtWidgets.QMainWindow):
         # calls the __init__ of the parent class
         super(UserInterface, self).__init__(parent)
         self.device = None
+        self.fit_state = False
         self.setWindowTitle("LED Experiment Program")
         self.central_widget = QtWidgets.QWidget()
 
@@ -72,7 +73,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.permanent_controls()
         self.U_U_plottab()
         self.I_U_plottab()
-        self.P_U_plottab()
+        self.P_R_plottab()
         self._createMenuBar()
         self._createStatusBar()
         # Code to open a dialogue which prompts to enter the port
@@ -93,6 +94,12 @@ class UserInterface(QtWidgets.QMainWindow):
         self.start_button.clicked.connect(self.call_scan)
         self.quit_button.clicked.connect(self.quit_program)
         self.save_button.clicked.connect(self.save_data)
+        self.fit_knop.clicked.connect(self.fit_call)
+
+    def fit_call(self):
+        self.device.fit_it()
+        self.fit_state = True
+        self.plot_it()
 
     def permanent_controls(self):
 
@@ -105,9 +112,11 @@ class UserInterface(QtWidgets.QMainWindow):
         options = QtWidgets.QFormLayout()
         vbox_settings.addLayout(options)
 
-        self.status_measurementbar = QtWidgets.QLineEdit("No measurement done yet")
-        self.status_measurementbar.setReadOnly(True)
-        self.status_measurementbar.setMaximumWidth(240)
+        # self.status_measurementbar = QtWidgets.QLineEdit("No measurement done yet")
+        # self.status_measurementbar.setReadOnly(True)
+        # self.status_measurementbar.setMaximumWidth(240)
+        self.fit_knop = QtWidgets.QPushButton("Fit")
+
         self.start_voltage = QtWidgets.QDoubleSpinBox()
         self.start_voltage.setSingleStep(0.01)
         self.start_voltage.setRange(0, 3.3)
@@ -138,7 +147,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.quit_button.setFixedSize(300, 40)
         self.quit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
 
-        options.addRow("Measurement status", self.status_measurementbar)
+        # options.addRow("Measurement status", self.status_measurementbar)
         options.addRow("Start voltage:", self.start_voltage)
         options.addRow("End voltage:", self.end_voltage)
         options.addRow("Number of steps:", self.nsteps)
@@ -147,6 +156,7 @@ class UserInterface(QtWidgets.QMainWindow):
         vbox_settings.addWidget(self.start_button)
         vbox_settings.addWidget(self.save_button)
         vbox_settings.addWidget(self.quit_button)
+        vbox_settings.addWidget(self.fit_knop)
 
     def show_dialog(self):
         """Opens the dialog to select the port with."""
@@ -201,30 +211,27 @@ class UserInterface(QtWidgets.QMainWindow):
     def U_U_plottab(self):
         """The main tab where all the scanning parameters are shown."""
         self.U_U_tab = QtWidgets.QWidget()
-        self.tabs.addTab(self.U_U_tab, "Measurements")
+        self.tabs.addTab(self.U_U_tab, "U_0 vs U_pv")
         hbox = QtWidgets.QHBoxLayout()
         self.plot_widget = pg.PlotWidget()
 
         hbox.addWidget(self.plot_widget)
 
-        self.tabs.setTabText(1, "Measurements")
         self.U_U_tab.setLayout(hbox)
 
-    def P_U_plottab(self):
+    def P_R_plottab(self):
         self.P_U_tab = QtWidgets.QWidget()
-        self.tabs.addTab(self.P_U_tab, "P vs U")
+        self.tabs.addTab(self.P_U_tab, "P vs R")
         hbox = QHBoxLayout()
         self.P_U_tab.setLayout(hbox)
-        self.P_U_plot = pg.PlotWidget()
-        hbox.addWidget(self.P_U_plot)
+        self.P_R_plot = pg.PlotWidget()
+        hbox.addWidget(self.P_R_plot)
 
     def call_scan(self):
         """Function that calls the scan
         Writes the time it has taken to perform the total scan to the measurement bar.
         Also calls the plot function to create the plot."""
-
-        begin = time.time()
-
+        self.fit_state = False
         self.device.start_scan(
             self.nsteps.value(),
             self.num_measurements.value(),
@@ -232,10 +239,9 @@ class UserInterface(QtWidgets.QMainWindow):
             self.end_voltage.value(),
         )
 
-        end = time.time()
         # self.device.close_session()
-        self.status_measurementbar.clear()
-        self.status_measurementbar.setText(f"Measurement done in {end-begin:.2f}s")
+        # self.status_measurementbar.clear()
+        # self.status_measurementbar.setText(f"Measurement done in {end-begin:.2f}s")
 
     def plot_it(self):
         """Plots the measurement data using the data stored in the model."""
@@ -266,13 +272,13 @@ class UserInterface(QtWidgets.QMainWindow):
         self.I_U_plot.clear()
         self.I_U_plot.setLabel("left", "I (A)")
         self.I_U_plot.setLabel("bottom", "Upv (V)")
-        error = pg.ErrorBarItem(
+        error_I_U = pg.ErrorBarItem(
             x=np.array(self.device.U_list),
             y=np.array(self.device.I_list),
             height=2 * np.array(self.device.I_err_list),
             width=2 * np.array(self.device.U_err_list),
         )
-        self.I_U_plot.addItem(error)
+        self.I_U_plot.addItem(error_I_U)
 
         self.I_U_plot.plot(
             np.array(self.device.U_list),
@@ -283,19 +289,19 @@ class UserInterface(QtWidgets.QMainWindow):
             symbolBrush=pg.mkBrush(0, 0, 255, 255),
             symbolSize=6,
         )
-        self.P_U_plot.clear()
-        self.P_U_plot.setLabel("left", "P (W)")
-        self.P_U_plot.setLabel("bottom", "Upv (V)")
-        error = pg.ErrorBarItem(
-            x=np.array(self.device.U_list),
-            y=np.array(self.device.P_list),
-            height=2 * np.array(self.device.P_err_list),
-            width=2 * np.array(self.device.U_err_list),
-        )
-        self.P_U_plot.addItem(error)
+        self.P_R_plot.clear()
+        self.P_R_plot.setLabel("left", "P (W)")
+        self.P_R_plot.setLabel("bottom", "R_mosfet (ohm)")
+        # error = pg.ErrorBarItem(
+        #     x=np.array(self.device.R_MOSFET_list),
+        #     y=np.array(self.device.P_list),
+        #     height=2 * np.array(self.device.P_err_list),
+        #     width=2 * np.array(self.device.R_MOSFET_list),
+        # )
+        # self.P_R_plot.addItem(error)
 
-        self.P_U_plot.plot(
-            np.array(self.device.U_list),
+        self.P_R_plot.plot(
+            np.array(self.device.R_MOSFET_list),
             np.array(self.device.P_list),
             pen=None,
             symbol="o",
@@ -303,6 +309,12 @@ class UserInterface(QtWidgets.QMainWindow):
             symbolBrush=pg.mkBrush(0, 0, 255, 255),
             symbolSize=6,
         )
+        if self.fit_state == True:
+            self.I_U_plot.plot(
+                self.device.fit_plot_list[0],
+                self.device.fit_plot_list[1],
+                pen=pg.mkPen(color=(255, 0, 0)),
+            )
 
     def save_data(self):
         """Saves the scan in a csv by opening system save file dialog."""
