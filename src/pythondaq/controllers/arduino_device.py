@@ -2,7 +2,6 @@ try:
     from nsp2visasim import sim_pyvisa as pv
 except ModuleNotFoundError:
     import pyvisa as pv
-import time
 
 
 """Module to control the Arduino device.
