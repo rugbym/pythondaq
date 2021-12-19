@@ -57,7 +57,8 @@ class UserInterface(QtWidgets.QMainWindow):
         super(UserInterface, self).__init__(parent)
         self.device = None
         self.fit_state = False
-        self.setWindowTitle("LED Experiment Program")
+        self.startvalues = False
+        self.setWindowTitle("PV Experiment Program")
         self.central_widget = QtWidgets.QWidget()
 
         self.central_widget.setMinimumSize(800, 600)
@@ -83,9 +84,9 @@ class UserInterface(QtWidgets.QMainWindow):
         # plot timer
         self.timer = QtCore.QTimer()
         # Calls plot and measurement status every 100ms
-        self.timer.timeout.connect(self.plot_it)
+        # self.timer.timeout.connect(self.plot_it)
         self.timer.timeout.connect(self.measurement_status)
-
+        # self.timer.timeout.connect()
         self.timer.start(100)
 
         # All slots and signals of all tabs
@@ -94,10 +95,11 @@ class UserInterface(QtWidgets.QMainWindow):
         self.select_port.triggered.connect(self._write_StatusBar)
         self.save.triggered.connect(self.save_data)
 
+        self.starting_values_button.clicked.connect(self.get_startingvalues)
         self.start_button.clicked.connect(self.call_scan)
         self.quit_button.clicked.connect(self.quit_program)
         self.save_button.clicked.connect(self.save_data)
-        self.fit_knop.clicked.connect(self.fit_call)
+        self.fit_button.clicked.connect(self.fit_call)
 
     def show_dialog(self):
         """Opens the dialog to select the port with."""
@@ -123,7 +125,6 @@ class UserInterface(QtWidgets.QMainWindow):
         self.status_measurementbar = QtWidgets.QLineEdit("No measurement done yet")
         self.status_measurementbar.setReadOnly(True)
         self.status_measurementbar.setMaximumWidth(240)
-        self.fit_knop = QtWidgets.QPushButton("Fit")
 
         self.start_voltage = QtWidgets.QDoubleSpinBox()
         self.start_voltage.setSingleStep(0.01)
@@ -145,6 +146,19 @@ class UserInterface(QtWidgets.QMainWindow):
         self.num_measurements.setMinimum(1)
         self.num_measurements.setMaximumWidth(240)
 
+        self.fit_results = QtWidgets.QLabel("Fit_results")
+        self.fit_n = QtWidgets.QLineEdit()
+        self.fit_n.setReadOnly(True)
+        self.fit_I_l = QtWidgets.QLineEdit()
+        self.fit_I_l.setReadOnly(True)
+        self.fit_I_0 = QtWidgets.QLineEdit()
+        self.fit_I_0.setReadOnly(True)
+        self.fit_redchi = QtWidgets.QLineEdit()
+        self.fit_redchi.setReadOnly(True)
+
+        self.starting_values_button = QtWidgets.QPushButton("Get start values")
+        self.starting_values_button.setFixedSize(300, 40)
+        self.starting_values_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.start_button = QtWidgets.QPushButton("Start measurement")
         self.start_button.setFixedSize(300, 40)
         self.start_button.setLayoutDirection(QtCore.Qt.RightToLeft)
@@ -154,17 +168,26 @@ class UserInterface(QtWidgets.QMainWindow):
         self.quit_button = QtWidgets.QPushButton("Quit program")
         self.quit_button.setFixedSize(300, 40)
         self.quit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self.fit_button = QtWidgets.QPushButton("Fit")
+        self.fit_button.setFixedSize(300, 40)
+        self.fit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
 
         options.addRow(self.status_measurementbar)
         options.addRow("Start voltage:", self.start_voltage)
         options.addRow("End voltage:", self.end_voltage)
         options.addRow("Number of steps:", self.nsteps)
         options.addRow("Number of measurements:", self.num_measurements)
+        options.addRow(self.fit_results)
+        options.addRow("n:", self.fit_n)
+        options.addRow("I_l", self.fit_I_l)
+        options.addRow("I_0", self.fit_I_0)
+        options.addRow("red χ2", self.fit_redchi)
 
+        vbox_settings.addWidget(self.starting_values_button)
         vbox_settings.addWidget(self.start_button)
         # vbox_settings.addWidget(self.save_button)
         # vbox_settings.addWidget(self.quit_button)
-        vbox_settings.addWidget(self.fit_knop)
+        vbox_settings.addWidget(self.fit_button)
 
     def _createMenuBar(self):
         """Creates the menu bar with different options to choose from."""
@@ -200,27 +223,32 @@ class UserInterface(QtWidgets.QMainWindow):
             self.status_measurementbar.setText("No measurement done")
         elif self.device._scan_thread.is_alive():
             self.status_measurementbar.setText("Measuring...")
+            self.plot_it()
         elif not self.device._scan_thread.is_alive():
+            self.fit_button.setDisabled(False)
             self.status_measurementbar.setText("Measurement done")
+            if self.startvalues:
+                self.start_voltage.setValue(self.device.startvalue)
+                self.end_voltage.setValue(self.device.stopvalue)
+                self.startvalues = False
+
+    def U_U_plottab(self):
+        """Tab where the Upv-U0-plot is displayed"""
+        self.U_U_tab = QtWidgets.QWidget()
+        self.tabs.addTab(self.U_U_tab, "U_0 vs U_pv")
+        hbox = QtWidgets.QHBoxLayout()
+        self.plot_widget = pg.PlotWidget()
+        hbox.addWidget(self.plot_widget)
+        self.U_U_tab.setLayout(hbox)
 
     def I_U_plottab(self):
+        """Tab where I-U-plot is displayed"""
         self.I_U_tab = QtWidgets.QWidget()
         self.tabs.addTab(self.I_U_tab, "I vs U")
         self.I_U_plot = pg.PlotWidget()
         hbox = QHBoxLayout()
         self.I_U_tab.setLayout(hbox)
         hbox.addWidget(self.I_U_plot)
-
-    def U_U_plottab(self):
-        """The main tab where all the scanning parameters are shown."""
-        self.U_U_tab = QtWidgets.QWidget()
-        self.tabs.addTab(self.U_U_tab, "U_0 vs U_pv")
-        hbox = QtWidgets.QHBoxLayout()
-        self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setRange(xRange=(0, self.end_voltage.value()), yRange=(0, 6))
-        hbox.addWidget(self.plot_widget)
-
-        self.U_U_tab.setLayout(hbox)
 
     def P_R_plottab(self):
         self.P_U_tab = QtWidgets.QWidget()
@@ -230,11 +258,20 @@ class UserInterface(QtWidgets.QMainWindow):
         self.P_R_plot = pg.PlotWidget()
         hbox.addWidget(self.P_R_plot)
 
+    def get_startingvalues(self):
+        """Function to generate starting values based on the slope of the Upv-Uzero graph"""
+        self.fit_state = False
+        self.fit_button.setDisabled(True)
+        self.startvalues = True
+        self.device.start_scan(65, 2, 0.7, 2.8, startvalues=self.startvalues)
+        self.status_measurementbar.setText("Getting values")
+
     def call_scan(self):
         """Function that calls the scan
         Writes the time it has taken to perform the total scan to the measurement bar.
         Also calls the plot function to create the plot."""
         self.fit_state = False
+        self.fit_button.setDisabled(True)
         self.device.start_scan(
             self.nsteps.value(),
             self.num_measurements.value(),
@@ -247,11 +284,11 @@ class UserInterface(QtWidgets.QMainWindow):
         # self.status_measurementbar.clear()
         # self.status_measurementbar.setText(f"Measurement done in {end-begin:.2f}s")
 
-    def plot_it(self):
-        """Plots the measurement data using the data stored in the model."""
-        # make the Uzero Upv plot
+    def U_U_plot_code(self):
         self.plot_widget.clear()
-
+        self.plot_widget.setRange(
+            xRange=(self.start_voltage.value(), self.end_voltage.value()), yRange=(0, 6)
+        )
         self.plot_widget.setLabel("left", "U_pv (V)")
         self.plot_widget.setLabel("bottom", "U_0 (V)")
 
@@ -272,10 +309,21 @@ class UserInterface(QtWidgets.QMainWindow):
             symbolBrush=pg.mkBrush(0, 0, 255, 255),
             symbolSize=6,
         )
-        # make the I U plot
+        if self.device._scan_thread != None:
+            if (
+                self.device._scan_thread.is_alive() == True
+                and len(self.device.U_list) > 5
+            ) and self.startvalues == True:
+                slopeline = lambda x, a, b: a * x + b
+                x = np.linspace(self.device.x[0] - 0.2, self.device.x[0] + 0.2, 10)
+                y = slopeline(x, self.device.slope, self.device.intercept)
+                self.plot_widget.plot(x, y, pen=pg.mkPen(color=(255, 0, 0), width=2))
+
+    def I_U_plot_code(self):
         self.I_U_plot.clear()
         self.I_U_plot.setLabel("left", "I (A)")
         self.I_U_plot.setLabel("bottom", "Upv (V)")
+
         error_I_U = pg.ErrorBarItem(
             x=np.array(self.device.U_list),
             y=np.array(self.device.I_list),
@@ -293,14 +341,41 @@ class UserInterface(QtWidgets.QMainWindow):
             symbolBrush=pg.mkBrush(0, 0, 255, 255),
             symbolSize=6,
         )
+        if self.fit_state == True:
+            self.I_U_plot.plot(
+                self.device.fit_plot_list[0],
+                self.device.fit_plot_list[1],
+                pen=pg.mkPen(color=(255, 0, 0), width=2),
+            )
+
+        if self.device.get_max_point == True:
+            self.I_U_plot.plot(
+                [self.device.U_list[self.device.maximum_power_loc]],
+                [self.device.I_list[self.device.maximum_power_loc]],
+                symbol="x",
+                symbolPen=pg.mkPen(color=(255, 0, 0)),
+            )
+            self.device.get_max_point = False
+            self.label_value = pg.TextItem("", **{"color": "#FFF"})
+            self.I_U_plot.addItem(self.label_value)
+            self.label_value.setPos(
+                QtCore.QPointF(
+                    self.device.U_list[self.device.maximum_power_loc],
+                    self.device.I_list[self.device.maximum_power_loc],
+                )
+            )
+            self.label_value.setText(str(self.dataPoint))
+
+    def P_R_plot_code(self):
         self.P_R_plot.clear()
+        self.P_R_plot.setRange(xRange=(0, 3000))
         self.P_R_plot.setLabel("left", "P (W)")
         self.P_R_plot.setLabel("bottom", "R_mosfet (ohm)")
         error = pg.ErrorBarItem(
             x=np.array(self.device.R_MOSFET_list),
             y=np.array(self.device.P_list),
             height=2 * np.array(self.device.P_err_list),
-            width=2 * np.array(self.device.R_MOSFET_list),
+            width=2 * np.array(self.device.R_MOSFET_err_list),
         )
         self.P_R_plot.addItem(error)
 
@@ -313,18 +388,39 @@ class UserInterface(QtWidgets.QMainWindow):
             symbolBrush=pg.mkBrush(0, 0, 255, 255),
             symbolSize=6,
         )
-        if self.fit_state == True:
-            self.I_U_plot.plot(
-                self.device.fit_plot_list[0],
-                self.device.fit_plot_list[1],
-                pen=pg.mkPen(color=(255, 0, 0), width=2),
+        if self.device.get_max_point == True:
+            self.P_R_plot.plot(
+                [self.device.R_MOSFET_list[self.device.maximum_power_loc]],
+                [self.device.P_list[self.device.maximum_power_loc]],
+                symbol="x",
+                symbolPen=pg.mkPen(color=(255, 0, 0)),
             )
+            self.device.get_max_point = False
+
+    def plot_it(self):
+        """Plots the measurement data using the data stored in the model.
+        Draws the three plots"""
+        # make the Uzero Upv plot
+        self.U_U_plot_code()
+        # make the I U plot
+        self.I_U_plot_code()
+
+        # make the P R plot
+        self.P_R_plot_code()
 
     def fit_call(self):
         """Calls fit and functions to display results"""
         self.device.fit_it()
         self.fit_state = True
         self.plot_it()
+        self.fit_redchi.setText(f"{self.device.fit.redchi:.3f}")
+        self.fit_I_0.setText(
+            f"{self.device.I_0*1000:.3f}\u00B1 {self.device.I_0_error*1000:.3f} mA"
+        )
+        self.fit_I_l.setText(
+            f"{self.device.I_l*1000:.3f}\u00B1 {self.device.I_l_error*1000:.3f} mA"
+        )
+        self.fit_n.setText(f"{self.device.n:.2f}\u00B1 {self.device.n_error:.2f}")
 
     def save_data(self):
         """Saves the scan in a csv by opening system save file dialog."""

@@ -2,6 +2,7 @@ from os import write
 import csv
 import numpy as np
 from scipy.constants import Boltzmann, elementary_charge
+from scipy.stats import linregress
 from statistics import mean, stdev
 from math import sqrt
 import threading
@@ -22,7 +23,8 @@ class PVExperiment:
     def __init__(self, port="ASRL3::INSTR"):
         """Initiates the class. Standard port is given to avoid typing or copy-pasting ports."""
         self.device = AVD(port=port)
-        self._scan_thread=None
+        self._scan_thread = None
+        self.get_max_point = False
         self.scan_data = []
         self.U_list = []
         self.I_list = []
@@ -34,6 +36,11 @@ class PVExperiment:
         self.R_MOSFET_list = []
         self.R_MOSFET_err_list = []
         self.fit_plot_list = []
+        self.x = []
+        self.slope = []
+        self.slope_height = []
+        self.startvalue = 0
+        self.stopvalue = 3.3
 
     def deviceinfo(self):
         """Info about the current connected device."""
@@ -123,14 +130,15 @@ class PVExperiment:
             err_mosfet_R,
         )
 
-    def start_scan(self, nsteps, samplesize, begin, end):
+    def start_scan(self, nsteps, samplesize, begin, end, startvalues=False):
         """Allows for threading and simultanious execution of code"""
         self._scan_thread = threading.Thread(
-            target=self.scan, args=(nsteps, samplesize, begin, end)
+            target=self.scan, args=(nsteps, samplesize, begin, end, startvalues)
         )
         self._scan_thread.start()
 
     def fit_it(self):
+        """Fits the U,I-data to a model."""
         self.fit_plot_list = []
         fitfunc = lambda U, n, T, I_l, I_0, e, k: I_l - I_0 * (
             np.exp((e * U) / (n * T * k)) - 1
@@ -141,7 +149,7 @@ class PVExperiment:
         params.add("n", value=17)
         params.add("e", value=elementary_charge, vary=False)
         params.add("k", value=Boltzmann, vary=False)
-        params.add("I_l", value=0.02)
+        params.add("I_l", value=mean(self.I_list[-2:]))
         params.add("I_0", value=0.0)
 
         self.fit = model.fit(
@@ -151,9 +159,9 @@ class PVExperiment:
             params=params,
         )
 
-        self.nT, self.nT_error = (
-            self.fit.params["nT"].value,
-            self.fit.params["nT"].stderr,
+        self.n, self.n_error = (
+            self.fit.params["n"].value,
+            self.fit.params["n"].stderr,
         )
         self.I_l, self.I_l_error = (
             self.fit.params["I_l"].value,
@@ -168,7 +176,8 @@ class PVExperiment:
             U_list_for_fit_plot,
             fitfunc(
                 U_list_for_fit_plot,
-                self.nT,
+                self.n,
+                293,
                 self.I_l,
                 self.I_0,
                 elementary_charge,
@@ -176,7 +185,26 @@ class PVExperiment:
             ),
         ]
 
-    def scan(self, nsteps, samplesize, begin=0, end=3.3):
+    def slope_calc(self):
+        """Calculates slope for getting approximate starting values"""
+        linecalc = linregress(self.U_zero_list[-5:], self.U_list[-5:])
+        self.intercept = linecalc[1]
+        self.slope = linecalc[0]
+        self.x = self.U_zero_list[-1:]
+        self.slope_height = mean(self.U_list[-5:])
+
+    def max_power_point(self):
+        """Finds maximum power value and where it is in the list"""
+        self.maximum_power = max(self.P_list)
+        self.maximum_power_loc = self.P_list.index(self.maximum_power)
+        print(
+            self.U_list[self.maximum_power_loc],
+            self.maximum_power,
+            self.R_MOSFET_list[self.maximum_power_loc],
+        )
+        self.get_max_point = True
+
+    def scan(self, nsteps, samplesize, begin=0, end=3.3, startvalues=False):
         """Perform measurements across a range of voltages.
 
         Generates a measurement and then uses
@@ -203,6 +231,8 @@ class PVExperiment:
         self.U_zero_list = []
         self.R_MOSFET_list = []
         self.R_MOSFET_err_list = []
+        descent = False
+        ascent = False
         for voltage in np.linspace(begin, end, nsteps):
             self.set_voltage(voltage)
             measurement = self.measure(samplesize)
@@ -217,7 +247,24 @@ class PVExperiment:
             self.U_zero_list.append(voltage)
             self.R_MOSFET_list.append(r)
             self.R_MOSFET_err_list.append(r_err)
+            if startvalues:
+                if len(self.U_list) > 5:
+                    self.slope_calc()
+                    slope = self.slope
+
+                    if slope < -1 and descent == False:
+                        descent = True
+                        startvalue = voltage + 0.02
+                    elif descent == True and slope > -1 and ascent == False:
+                        ascent = True
+                        stopvalue = voltage - 0.1
+
+        if startvalues:
+            self.startvalue = startvalue
+            self.stopvalue = stopvalue
         self.reset_out()
+        if not startvalues:
+            self.max_power_point()
         return self.scan_data
 
     def reset_out(self):
