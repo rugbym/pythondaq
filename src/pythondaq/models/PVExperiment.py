@@ -131,14 +131,19 @@ class PVExperiment:
         )
 
     def start_scan(self, nsteps, samplesize, begin, end, startvalues=False):
-        """Allows for threading and simultanious execution of code"""
+        """Allows for threading and simultanious execution of code
+        Starts the thread in this function"""
         self._scan_thread = threading.Thread(
             target=self.scan, args=(nsteps, samplesize, begin, end, startvalues)
         )
         self._scan_thread.start()
 
     def fit_it(self):
-        """Fits the U,I-data to a model."""
+        """Fits the U,I-data to a model.
+
+        Uses average of last 2 points of the current to set starting parameter
+        for I_l.
+        """
         self.fit_plot_list = []
         fitfunc = lambda U, n, T, I_l, I_0, e, k: I_l - I_0 * (
             np.exp((e * U) / (n * T * k)) - 1
@@ -220,6 +225,8 @@ class PVExperiment:
                 Starting voltage value of the sweep
             end:
                 Ending value of the sweep
+        Returns:
+            list whit all the scan data
         """
         self.scan_data = []
         self.U_list = []
@@ -257,7 +264,7 @@ class PVExperiment:
                         startvalue = voltage + 0.02
                     elif descent == True and slope > -1 and ascent == False:
                         ascent = True
-                        stopvalue = voltage - 0.1
+                        stopvalue = voltage - 0.13
 
         if startvalues:
             self.startvalue = startvalue
@@ -271,15 +278,16 @@ class PVExperiment:
         """Sets the output of the device to 0"""
         self.device.turn_off()
 
-    def csv_maker(self, filename, app=True):
-        """Creates a csv file with the measurements and saves it under a unique name."""
-        #
+    def csv_maker(self, filename):
+        """Creates a csv file with the measurements and saves it under a unique name.
+        Arguments:
+            filename:
+                A string containing the name of the csv and if necessary the path to save the file
+
+        """
+
         if len(str.split(filename, ".csv")) == 1:
             filename = filename + ".csv"
-        if app == True:
-            pad = ""
-        if app == False:
-            pad = "\\Users\\mmael\\NSP2\\pythondaq\\pythondaq\\"
 
         i = 0
         name = str.split(filename, ".")
@@ -310,25 +318,12 @@ class PVExperiment:
         self.device.disconnect_device()
 
 
-def listing(search="", app=False):
+def listing():
+    """Returns list of the devices connected to your computer.
+    Arguments:
+
+    Returns:
+        List of connected ports"""
     ports = CD()
-    if app == False:
-        if search == "":
-            print(f"The list of devices is:")
-            for device in ports:
-                print(f"{device}")
-
-        else:
-            found_devices = []
-            for device in ports:
-                if search in device:
-                    found_devices.append(device)
-
-            if len(found_devices) == 0:
-                print("No device was found matching the search phrase")
-            else:
-                print("The device(s) matching the search phrase are:")
-                for item in found_devices:
-                    print(item)
 
     return ports
