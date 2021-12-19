@@ -244,9 +244,6 @@ class PVExperiment:
             self.startvalue = startvalue
             self.stopvalue = stopvalue
 
-        if not startvalues:
-            self.max_power_point()
-
         self.reset_out()
         return self.scan_data
 
