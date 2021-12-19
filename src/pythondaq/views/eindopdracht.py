@@ -108,10 +108,17 @@ class UserInterface(QtWidgets.QMainWindow):
         """Opens the dialog to select the port with."""
         self.dialog = PortSelection(self)
         self.dialog.exec_()
-        self.port = self.dialog.port
+        try:
+            self.port = self.dialog.port
+        except AttributeError:
+            print("Please select a port next time")
+            quit()
+
         if self.device != None:
             self.device.close_session()
+
         self.device = PVE(port=self.port)
+
         self._write_StatusBar()
         self.clear_plots()
         self.start_voltage.setValue(0)
@@ -184,12 +191,12 @@ class UserInterface(QtWidgets.QMainWindow):
         self.starting_values_button = QtWidgets.QPushButton("Get approx. start values")
         self.starting_values_button.setFixedSize(300, 40)
         self.starting_values_button.setStyleSheet(
-            "QPushButton {background-color:rgb(10,200,10)}"
+            "QPushButton {background-color:rgb(20,20,150)}"
         )
         self.starting_values_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.start_button = QtWidgets.QPushButton("Start measurement")
         self.start_button.setFixedSize(300, 40)
-        self.start_button.setStyleSheet("QPushButton {background-color:rgb(100,10,50)}")
+        self.start_button.setStyleSheet("QPushButton {background-color:rgb(10,200,50)}")
         self.start_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.save_button = QtWidgets.QPushButton("Save measurements")
         self.save_button.setFixedSize(300, 40)
@@ -273,6 +280,7 @@ class UserInterface(QtWidgets.QMainWindow):
             self.status_measurementbar.setText("Measuring...")
             self.plot_it()
         elif not self.device._scan_thread.is_alive():
+            self.starting_values_button.setDisabled(False)
             self.fit_button.setDisabled(False)
             self.start_button.setDisabled(False)
             self.status_measurementbar.setText("Measurement done")
@@ -329,6 +337,7 @@ class UserInterface(QtWidgets.QMainWindow):
     def get_startingvalues(self):
         """Function to generate starting values based on the slope of the Upv-Uzero graph"""
         self.fit_state = False
+        self.starting_values_button.setDisabled(True)
         self.fit_button.setDisabled(True)
         self.start_button.setDisabled(True)
         self.startvalues = True
@@ -340,6 +349,7 @@ class UserInterface(QtWidgets.QMainWindow):
         Writes the time it has taken to perform the total scan to the measurement bar.
         Also calls the plot function to create the plot."""
         self.fit_state = False
+        self.starting_values_button.setDisabled(True)
         self.fit_button.setDisabled(True)
         self.start_button.setDisabled(True)
         self.device.start_scan(

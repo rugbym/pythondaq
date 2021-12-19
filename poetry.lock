@@ -105,7 +105,7 @@ setuptools_scm = ">=4"
 
 [[package]]
 name = "nsp2visasim"
-version = "1.3.0"
+version = "1.3.1"
 description = ""
 category = "dev"
 optional = false
@@ -253,6 +253,23 @@ python-versions = ">=3.6"
 typing-extensions = "*"
 
 [[package]]
+name = "pyvisa-py"
+version = "0.5.2"
+description = "Python VISA bindings for GPIB, RS232, and USB instruments"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyvisa = ">=1.11.0"
+typing-extensions = "*"
+
+[package.extras]
+gpib_ctypes = ["gpib-ctypes (>=0.3.0)"]
+serial = ["pyserial (>=3.0)"]
+usb = ["pyusb"]
+
+[[package]]
 name = "scipy"
 version = "1.7.3"
 description = "SciPy: Scientific Library for Python"
@@ -322,7 +339,7 @@ tests = ["nose", "numpy"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.10"
-content-hash = "e18578ffa906b36cb85bb72ad45fdc541f0b8ffc1b2dadce00ea55691e33158f"
+content-hash = "ed6fbf90d362b5f69a6d8ecc16c3cb8b964d18447db29777a346fbcbf5e6468a"
 
 [metadata.files]
 asteval = [
@@ -434,8 +451,8 @@ matplotlib = [
     {file = "matplotlib-3.5.1.tar.gz", hash = "sha256:b2e9810e09c3a47b73ce9cab5a72243a1258f61e7900969097a817232246ce1c"},
 ]
 nsp2visasim = [
-    {file = "nsp2visasim-1.3.0-py3-none-any.whl", hash = "sha256:b90fddedf7f662ce9c43672c9398aa159fc94c018d31a85f6c10580058bc6498"},
-    {file = "nsp2visasim-1.3.0.tar.gz", hash = "sha256:cbc5979868ffc5ad3a48ff95fb854e65b00d1d7c949440997e253de8c6ea99c6"},
+    {file = "nsp2visasim-1.3.1-py3-none-any.whl", hash = "sha256:0d3a2356332573d51670b5250594dccfdbf5a80385ad9dc87067d55706373fde"},
+    {file = "nsp2visasim-1.3.1.tar.gz", hash = "sha256:94a8ae969b0a1d86ce5f4259a5d6aa127e8407bbedd9aa40128f7404a7f7f43c"},
 ]
 numpy = [
     {file = "numpy-1.21.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:8890b3360f345e8360133bc078d2dacc2843b6ee6059b568781b15b97acbe39f"},
@@ -601,6 +618,10 @@ pytz = [
 pyvisa = [
     {file = "PyVISA-1.11.3-py3-none-any.whl", hash = "sha256:0a03d86cb0ec7b660cdade20d0c868f90feaecfda20dd5569be2cbb8e34cb394"},
     {file = "PyVISA-1.11.3.tar.gz", hash = "sha256:fb4b601d49fce1a00926fcdde5548bd54f0511f549188a3e0c1e4628c3d86703"},
+]
+pyvisa-py = [
+    {file = "PyVISA-py-0.5.2.tar.gz", hash = "sha256:70fdf68e6dabd45dab28ddcd73460d66c525acd7ff6d66a59c4dd8ff8afc7214"},
+    {file = "PyVISA_py-0.5.2-py3-none-any.whl", hash = "sha256:fd5fc0189e7f968505bcbd67e7f3477eebcc9b6e7e32a970a5cd0fba79b2403a"},
 ]
 scipy = [
     {file = "scipy-1.7.3-1-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:c9e04d7e9b03a8a6ac2045f7c5ef741be86727d8f49c45db45f244bdd2bcff17"},
