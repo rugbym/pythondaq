@@ -43,15 +43,11 @@ class PVExperiment:
         self.stopvalue = 3.3
 
     def deviceinfo(self):
-        """Info about the current connected device."""
+        """Returns info about the current connected device."""
         return self.device.get_id_string()
 
     def set_voltage(self, voltage):
         self.device.set_output_voltage(0, voltage)
-
-    def meas_curr_diode(self):
-        u_ch2 = float(self.device.get_input_voltage(2))
-        return u_ch2 / 220
 
     def measure(self, samplesize=1):
         """Calculate current and voltage across diode using measurements.
