@@ -25,8 +25,9 @@ class PortSelection(QtWidgets.QDialog):
         self.poorten_text = QtWidgets.QLabel("Available ports:")
         self.poorten_text.setFixedSize(240, 15)
         self.poorten = QtWidgets.QComboBox()
-        for item in listing(app=True):
+        for item in listing():
             self.poorten.addItem(f"{item}")
+
         self.poorten.setMaximumWidth(240)
         self.poorten.setMinimumWidth(150)
 
@@ -95,6 +96,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.select_port.triggered.connect(self._write_StatusBar)
         self.save.triggered.connect(self.save_data)
 
+        self.plot_clear_button.clicked.connect(self.clear_plots)
         self.starting_values_button.clicked.connect(self.get_startingvalues)
         self.start_button.clicked.connect(self.call_scan)
         self.quit_button.clicked.connect(self.quit_program)
@@ -110,6 +112,9 @@ class UserInterface(QtWidgets.QMainWindow):
             self.device.close_session()
         self.device = PVE(port=self.port)
         self._write_StatusBar()
+        self.clear_plots()
+        self.start_voltage.setValue(0)
+        self.end_voltage.setValue(3.3)
 
     def permanent_controls(self):
 
@@ -156,7 +161,11 @@ class UserInterface(QtWidgets.QMainWindow):
         self.fit_redchi = QtWidgets.QLineEdit()
         self.fit_redchi.setReadOnly(True)
 
-        self.starting_values_button = QtWidgets.QPushButton("Get start values")
+        # All buttons
+        self.plot_clear_button = QtWidgets.QPushButton("Clear all Plots")
+        self.plot_clear_button.setFixedSize(300, 40)
+        self.plot_clear_button.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self.starting_values_button = QtWidgets.QPushButton("Get approx. start values")
         self.starting_values_button.setFixedSize(300, 40)
         self.starting_values_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.start_button = QtWidgets.QPushButton("Start measurement")
@@ -172,6 +181,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.fit_button.setFixedSize(300, 40)
         self.fit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
 
+        # Adding spinboxes to the options
         options.addRow(self.status_measurementbar)
         options.addRow("Start voltage:", self.start_voltage)
         options.addRow("End voltage:", self.end_voltage)
@@ -183,6 +193,8 @@ class UserInterface(QtWidgets.QMainWindow):
         options.addRow("I_0", self.fit_I_0)
         options.addRow("red χ2", self.fit_redchi)
 
+        # adding buttons
+        vbox_settings.addWidget(self.plot_clear_button)
         vbox_settings.addWidget(self.starting_values_button)
         vbox_settings.addWidget(self.start_button)
         # vbox_settings.addWidget(self.save_button)
@@ -232,13 +244,18 @@ class UserInterface(QtWidgets.QMainWindow):
                 self.end_voltage.setValue(self.device.stopvalue)
                 self.startvalues = False
 
+    def clear_plots(self):
+        self.U_U_plot.clear()
+        self.I_U_plot.clear()
+        self.P_R_plot.clear()
+
     def U_U_plottab(self):
         """Tab where the Upv-U0-plot is displayed"""
         self.U_U_tab = QtWidgets.QWidget()
         self.tabs.addTab(self.U_U_tab, "U_0 vs U_pv")
         hbox = QtWidgets.QHBoxLayout()
-        self.plot_widget = pg.PlotWidget()
-        hbox.addWidget(self.plot_widget)
+        self.U_U_plot = pg.PlotWidget()
+        hbox.addWidget(self.U_U_plot)
         self.U_U_tab.setLayout(hbox)
 
     def I_U_plottab(self):
@@ -285,12 +302,13 @@ class UserInterface(QtWidgets.QMainWindow):
         # self.status_measurementbar.setText(f"Measurement done in {end-begin:.2f}s")
 
     def U_U_plot_code(self):
-        self.plot_widget.clear()
-        self.plot_widget.setRange(
+        """Code for plotting the U-U Plot"""
+        self.U_U_plot.clear()
+        self.U_U_plot.setRange(
             xRange=(self.start_voltage.value(), self.end_voltage.value()), yRange=(0, 6)
         )
-        self.plot_widget.setLabel("left", "U_pv (V)")
-        self.plot_widget.setLabel("bottom", "U_0 (V)")
+        self.U_U_plot.setLabel("left", "U_pv (V)")
+        self.U_U_plot.setLabel("bottom", "U_0 (V)")
 
         error_U_U = pg.ErrorBarItem(
             x=np.array(self.device.U_zero_list),
@@ -298,9 +316,9 @@ class UserInterface(QtWidgets.QMainWindow):
             height=2 * np.array(self.device.U_err_list),
             # width=2 * np.array(self.device.U_zero_list),
         )
-        self.plot_widget.addItem(error_U_U)
+        self.U_U_plot.addItem(error_U_U)
 
-        self.plot_widget.plot(
+        self.U_U_plot.plot(
             np.array(self.device.U_zero_list),
             np.array(self.device.U_list),
             pen=None,
@@ -317,7 +335,7 @@ class UserInterface(QtWidgets.QMainWindow):
                 slopeline = lambda x, a, b: a * x + b
                 x = np.linspace(self.device.x[0] - 0.2, self.device.x[0] + 0.2, 10)
                 y = slopeline(x, self.device.slope, self.device.intercept)
-                self.plot_widget.plot(x, y, pen=pg.mkPen(color=(255, 0, 0), width=2))
+                self.U_U_plot.plot(x, y, pen=pg.mkPen(color=(255, 0, 0), width=2))
 
     def I_U_plot_code(self):
         self.I_U_plot.clear()
@@ -364,13 +382,12 @@ class UserInterface(QtWidgets.QMainWindow):
                     self.device.I_list[self.device.maximum_power_loc],
                 )
             )
-            self.label_value.setText(str(self.dataPoint))
+            self.label_value.setText("maximum power")
 
     def P_R_plot_code(self):
         self.P_R_plot.clear()
-        self.P_R_plot.setRange(xRange=(0, 3000))
         self.P_R_plot.setLabel("left", "P (W)")
-        self.P_R_plot.setLabel("bottom", "R_mosfet (ohm)")
+        self.P_R_plot.setLabel("bottom", "R_mosfet (\u2126)")
         error = pg.ErrorBarItem(
             x=np.array(self.device.R_MOSFET_list),
             y=np.array(self.device.P_list),
@@ -404,7 +421,6 @@ class UserInterface(QtWidgets.QMainWindow):
         self.U_U_plot_code()
         # make the I U plot
         self.I_U_plot_code()
-
         # make the P R plot
         self.P_R_plot_code()
 
