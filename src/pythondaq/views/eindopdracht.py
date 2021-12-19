@@ -183,8 +183,8 @@ class UserInterface(QtWidgets.QMainWindow):
         self.max_gen_p_u.setReadOnly(True)
         # All buttons
         self.disp_max_power = QtWidgets.QPushButton("Display Max Power point")
-        self.disp_max_power.setFixedSize(300, 40)
-        self.disp_max_power.setLayoutDirection(QtCore.Qt.RightToLeft)
+        # self.disp_max_power.setFixedSize(300, 40)
+        # self.disp_max_power.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.plot_clear_button = QtWidgets.QPushButton("Clear all Plots")
         self.plot_clear_button.setFixedSize(300, 40)
         self.plot_clear_button.setLayoutDirection(QtCore.Qt.RightToLeft)
@@ -205,8 +205,8 @@ class UserInterface(QtWidgets.QMainWindow):
         self.quit_button.setFixedSize(300, 40)
         self.quit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.fit_button = QtWidgets.QPushButton("Fit")
-        self.fit_button.setFixedSize(300, 40)
-        self.fit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
+        # self.fit_button.setFixedSize(300, 40)
+        # self.fit_button.setLayoutDirection(QtCore.Qt.RightToLeft)
 
         # Adding spinboxes to the options
         options.addRow(self.status_measurementbar)
@@ -215,24 +215,24 @@ class UserInterface(QtWidgets.QMainWindow):
         options.addRow("Number of steps:", self.nsteps)
         options.addRow("Number of measurements:", self.num_measurements)
         # Adding fit results to options
-        options.addRow(self.fit_results)
+        options.addRow(self.fit_results, self.fit_button)
         options.addRow("n:", self.fit_n)
         options.addRow("I_l", self.fit_I_l)
         options.addRow("I_0", self.fit_I_0)
         options.addRow("red χ2", self.fit_redchi)
         # adding Max power to options
-        options.addRow(self.max_gen_powertitle)
+        options.addRow(self.max_gen_powertitle, self.disp_max_power)
         options.addRow("P_pv:", self.max_gen_power)
         options.addRow("R_MOSFET:", self.max_gen_p_R)
         options.addRow("U_pv:", self.max_gen_p_u)
         # adding buttons
         vbox_settings.addWidget(self.starting_values_button)
-        vbox_settings.addWidget(self.disp_max_power)
+        # vbox_settings.addWidget(self.disp_max_power)
         vbox_settings.addWidget(self.plot_clear_button)
         vbox_settings.addWidget(self.start_button)
         # vbox_settings.addWidget(self.save_button)
         # vbox_settings.addWidget(self.quit_button)
-        vbox_settings.addWidget(self.fit_button)
+        # vbox_settings.addWidget(self.fit_button)
 
     def _createMenuBar(self):
         """Creates the menu bar with different options to choose from."""
@@ -249,6 +249,11 @@ class UserInterface(QtWidgets.QMainWindow):
         menuBar.addMenu(deviceMenu)
         self.select_port = QAction("Select Port", self)
         deviceMenu.addAction(self.select_port)
+
+        second_app_menu = QMenu("&Other apps", self)
+        menuBar.addMenu(second_app_menu)
+        max_power_point_track = QAction("Max Power Point Tracking", self)
+        second_app_menu.addAction(max_power_point_track)
 
     def _createStatusBar(self):
         """Creates the statusbar on the bottom of the screen."""
