@@ -24,7 +24,7 @@ class PVExperiment:
         """Initiates the class. Standard port is given to avoid typing or copy-pasting ports."""
         self.device = AVD(port=port)
         self._scan_thread = None
-        self.get_max_point = False
+        self.get_max_point = None
         self.scan_data = []
         self.U_list = []
         self.I_list = []
@@ -173,15 +173,14 @@ class PVExperiment:
         self.slope_height = mean(self.U_list[-5:])
 
     def max_power_point(self):
-        """Finds maximum power value and where it is in the list"""
+        """Finds maximum power value and where it is in the list.
+
+        Returns:
+            Location in measurments of maximum generated power value."""
         self.maximum_power = max(self.P_list)
         self.maximum_power_loc = self.P_list.index(self.maximum_power)
-        print(
-            self.U_list[self.maximum_power_loc],
-            self.maximum_power,
-            self.R_MOSFET_list[self.maximum_power_loc],
-        )
         self.get_max_point = True
+        return self.maximum_power_loc
 
     def scan(self, nsteps, samplesize, begin=0, end=3.3, startvalues=False):
         """Perform measurements across a range of voltages.
@@ -214,6 +213,7 @@ class PVExperiment:
         self.R_MOSFET_err_list = []
         descent = False
         ascent = False
+        self.get_max_point = None
         for voltage in np.linspace(begin, end, nsteps):
             self.set_voltage(voltage)
             measurement = self.measure(samplesize)
@@ -243,9 +243,11 @@ class PVExperiment:
         if startvalues:
             self.startvalue = startvalue
             self.stopvalue = stopvalue
-        self.reset_out()
+
         if not startvalues:
             self.max_power_point()
+
+        self.reset_out()
         return self.scan_data
 
     def reset_out(self):
@@ -259,7 +261,6 @@ class PVExperiment:
                 A string containing the name of the csv and if necessary the path to save the file
 
         """
-
         if len(str.split(filename, ".csv")) == 1:
             filename = filename + ".csv"
 
