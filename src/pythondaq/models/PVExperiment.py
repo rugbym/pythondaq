@@ -211,6 +211,9 @@ class PVExperiment:
         self.U_zero_list = []
         self.R_MOSFET_list = []
         self.R_MOSFET_err_list = []
+        if startvalues:
+            startvalue = 0
+            stopvalue = 3.3
         descent = False
         ascent = False
         self.get_max_point = None
