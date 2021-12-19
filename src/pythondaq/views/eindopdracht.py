@@ -1,4 +1,4 @@
-from PyQt5 import QtWidgets, uic, QtCore
+from PyQt5 import QtWidgets, uic, QtCore, QtGui
 import sys
 import time
 from pyqtgraph import Qt
@@ -102,6 +102,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.quit_button.clicked.connect(self.quit_program)
         self.save_button.clicked.connect(self.save_data)
         self.fit_button.clicked.connect(self.fit_call)
+        self.disp_max_power.clicked.connect(self.show_max_power)
 
     def show_dialog(self):
         """Opens the dialog to select the port with."""
@@ -115,6 +116,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.clear_plots()
         self.start_voltage.setValue(0)
         self.end_voltage.setValue(3.3)
+        self.clear_textfields()
 
     def permanent_controls(self):
 
@@ -131,6 +133,7 @@ class UserInterface(QtWidgets.QMainWindow):
         self.status_measurementbar.setReadOnly(True)
         self.status_measurementbar.setMaximumWidth(240)
 
+        # all options for doing measurements
         self.start_voltage = QtWidgets.QDoubleSpinBox()
         self.start_voltage.setSingleStep(0.01)
         self.start_voltage.setRange(0, 3.3)
@@ -151,7 +154,9 @@ class UserInterface(QtWidgets.QMainWindow):
         self.num_measurements.setMinimum(1)
         self.num_measurements.setMaximumWidth(240)
 
-        self.fit_results = QtWidgets.QLabel("Fit_results")
+        # all labels and lines for displaying fit-results
+        self.fit_results = QtWidgets.QLabel("Fit results:")
+        self.fit_results.setFont(QtGui.QFont("Times", weight=QtGui.QFont.Bold))
         self.fit_n = QtWidgets.QLineEdit()
         self.fit_n.setReadOnly(True)
         self.fit_I_l = QtWidgets.QLineEdit()
@@ -160,16 +165,31 @@ class UserInterface(QtWidgets.QMainWindow):
         self.fit_I_0.setReadOnly(True)
         self.fit_redchi = QtWidgets.QLineEdit()
         self.fit_redchi.setReadOnly(True)
-
+        # Maximum generated power at Resistance R
+        self.max_gen_powertitle = QtWidgets.QLabel("Max. Power data:")
+        self.max_gen_powertitle.setFont(QtGui.QFont("Times", weight=QtGui.QFont.Bold))
+        self.max_gen_power = QtWidgets.QLineEdit()
+        self.max_gen_power.setReadOnly(True)
+        self.max_gen_p_R = QtWidgets.QLineEdit()
+        self.max_gen_power.setReadOnly(True)
+        self.max_gen_p_u = QtWidgets.QLineEdit()
+        self.max_gen_p_u.setReadOnly(True)
         # All buttons
+        self.disp_max_power = QtWidgets.QPushButton("Display Max Power point")
+        self.disp_max_power.setFixedSize(300, 40)
+        self.disp_max_power.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.plot_clear_button = QtWidgets.QPushButton("Clear all Plots")
         self.plot_clear_button.setFixedSize(300, 40)
         self.plot_clear_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.starting_values_button = QtWidgets.QPushButton("Get approx. start values")
         self.starting_values_button.setFixedSize(300, 40)
+        self.starting_values_button.setStyleSheet(
+            "QPushButton {background-color:rgb(10,200,10)}"
+        )
         self.starting_values_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.start_button = QtWidgets.QPushButton("Start measurement")
         self.start_button.setFixedSize(300, 40)
+        self.start_button.setStyleSheet("QPushButton {background-color:rgb(100,10,50)}")
         self.start_button.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.save_button = QtWidgets.QPushButton("Save measurements")
         self.save_button.setFixedSize(300, 40)
@@ -187,15 +207,21 @@ class UserInterface(QtWidgets.QMainWindow):
         options.addRow("End voltage:", self.end_voltage)
         options.addRow("Number of steps:", self.nsteps)
         options.addRow("Number of measurements:", self.num_measurements)
+        # Adding fit results to options
         options.addRow(self.fit_results)
         options.addRow("n:", self.fit_n)
         options.addRow("I_l", self.fit_I_l)
         options.addRow("I_0", self.fit_I_0)
         options.addRow("red χ2", self.fit_redchi)
-
+        # adding Max power to options
+        options.addRow(self.max_gen_powertitle)
+        options.addRow("P_pv:", self.max_gen_power)
+        options.addRow("R_MOSFET:", self.max_gen_p_R)
+        options.addRow("U_pv:", self.max_gen_p_u)
         # adding buttons
-        vbox_settings.addWidget(self.plot_clear_button)
         vbox_settings.addWidget(self.starting_values_button)
+        vbox_settings.addWidget(self.disp_max_power)
+        vbox_settings.addWidget(self.plot_clear_button)
         vbox_settings.addWidget(self.start_button)
         # vbox_settings.addWidget(self.save_button)
         # vbox_settings.addWidget(self.quit_button)
@@ -229,6 +255,16 @@ class UserInterface(QtWidgets.QMainWindow):
         self.device_info.clear()
         self.device_info.setText(f"Connected device: {self.device.deviceinfo()}")
 
+    def clear_textfields(self):
+        """Clears all the textfields"""
+        self.fit_I_0.clear()
+        self.fit_I_l.clear()
+        self.fit_n.clear()
+        self.fit_redchi.clear()
+        self.max_gen_power.clear()
+        self.max_gen_p_R.clear()
+        self.max_gen_p_u.clear()
+
     def measurement_status(self):
         """Shows the measurement status above the measurement settings"""
         if self.device._scan_thread == None:
@@ -238,6 +274,7 @@ class UserInterface(QtWidgets.QMainWindow):
             self.plot_it()
         elif not self.device._scan_thread.is_alive():
             self.fit_button.setDisabled(False)
+            self.start_button.setDisabled(False)
             self.status_measurementbar.setText("Measurement done")
             if self.startvalues:
                 self.start_voltage.setValue(self.device.startvalue)
@@ -248,6 +285,20 @@ class UserInterface(QtWidgets.QMainWindow):
         self.U_U_plot.clear()
         self.I_U_plot.clear()
         self.P_R_plot.clear()
+
+    def show_max_power(self):
+        self.device.max_power_point()
+        self.plot_it()
+        self.device.get_max_point = None
+        self.max_gen_power.setText(
+            f"{1000*self.device.P_list[self.device.maximum_power_loc]:.1f}\u00B1 {1000*self.device.P_err_list[self.device.maximum_power_loc]:.1f} mW"
+        )
+        self.max_gen_p_R.setText(
+            f"{self.device.R_MOSFET_list[self.device.maximum_power_loc]:.2f}\u00B1 {self.device.R_MOSFET_err_list[self.device.maximum_power_loc]:.2f} \u2126"
+        )
+        self.max_gen_p_u.setText(
+            f"{self.device.U_list[self.device.maximum_power_loc]:.2f}\u00B1{self.device.U_err_list[self.device.maximum_power_loc]:.2f}V"
+        )
 
     def U_U_plottab(self):
         """Tab where the Upv-U0-plot is displayed"""
@@ -279,6 +330,7 @@ class UserInterface(QtWidgets.QMainWindow):
         """Function to generate starting values based on the slope of the Upv-Uzero graph"""
         self.fit_state = False
         self.fit_button.setDisabled(True)
+        self.start_button.setDisabled(True)
         self.startvalues = True
         self.device.start_scan(65, 2, 0.7, 2.8, startvalues=self.startvalues)
         self.status_measurementbar.setText("Getting values")
@@ -289,6 +341,7 @@ class UserInterface(QtWidgets.QMainWindow):
         Also calls the plot function to create the plot."""
         self.fit_state = False
         self.fit_button.setDisabled(True)
+        self.start_button.setDisabled(True)
         self.device.start_scan(
             self.nsteps.value(),
             self.num_measurements.value(),
@@ -366,7 +419,7 @@ class UserInterface(QtWidgets.QMainWindow):
                 pen=pg.mkPen(color=(255, 0, 0), width=2),
             )
 
-        if self.device.get_max_point == True:
+        if self.device.get_max_point != None:
             self.I_U_plot.plot(
                 [self.device.U_list[self.device.maximum_power_loc]],
                 [self.device.I_list[self.device.maximum_power_loc]],
@@ -405,14 +458,13 @@ class UserInterface(QtWidgets.QMainWindow):
             symbolBrush=pg.mkBrush(0, 0, 255, 255),
             symbolSize=6,
         )
-        if self.device.get_max_point == True:
+        if self.device.get_max_point != None:
             self.P_R_plot.plot(
                 [self.device.R_MOSFET_list[self.device.maximum_power_loc]],
                 [self.device.P_list[self.device.maximum_power_loc]],
                 symbol="x",
                 symbolPen=pg.mkPen(color=(255, 0, 0)),
             )
-            self.device.get_max_point = False
 
     def plot_it(self):
         """Plots the measurement data using the data stored in the model.
