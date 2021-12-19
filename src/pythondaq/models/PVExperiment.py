@@ -53,28 +53,6 @@ class PVExperiment:
         u_ch2 = float(self.device.get_input_voltage(2))
         return u_ch2 / 220
 
-    def u_pv_u_zero(self):
-        """First draft for calculating voltages"""
-        nsteps, begin, end = 1000, 0, 3.3
-        stepsize = (end - begin) / nsteps
-
-        u_zerolist = []
-        u_pvlist = []
-        datalist = []
-        for n in np.arange(begin, end, stepsize):
-
-            self.device.set_output_voltage(0, n)
-
-            u_ch0 = float(self.device.get_output_voltage(0))
-            u_ch1 = float(self.device.get_input_voltage(1))
-
-            u_pv = 3 * u_ch1
-            u_zerolist.append(u_ch0), u_pvlist.append(u_pv)
-            datalist.append((u_ch0, u_pv))
-
-        self.u_zerolist = u_zerolist
-        self.u_pvlist = u_pvlist
-
     def measure(self, samplesize=1):
         """Calculate current and voltage across diode using measurements.
 
